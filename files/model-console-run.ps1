@@ -56,7 +56,16 @@ $WS       = Join-Path $PACKDIR 'logs'
 $GWRESCUE = 'D:\06.AItools\openclaw\workspace\tools\gateway-rescue.ps1'
 $CACHECLR = 'D:\06.AItools\strata-cache-clear.ps1'
 $LLMSVC   = 'D:\06.AItools\llm-service.ps1'
-$PWSH     = 'C:\Program Files\PowerShell\7\pwsh.exe'
+# [2026-10-23 v29] PowerShell 7 的位置改成运行时自己解析（修「朋友机器点什么都报：系统找不到指定的文件」）
+#   朋友机器的 pwsh 是**微软商店版**（C:\Users\<用户>\AppData\Local\Microsoft\WindowsApps\...\pwsh.exe），
+#   而原来写死的默认值是 **MSI 版路径** C:\Program Files\PowerShell\7\pwsh.exe → 不存在 →
+#   Start-Process 直接报「系统找不到指定的文件」；连「自检并修正路径」自己都起不来（它也要用 pwsh 起）= 死锁。
+#   本脚本本身就是被 pwsh 跑的 → $PSHOME 就是真 pwsh 所在目录，最可靠；再退回 MSI 默认路径；再退回 PATH 里的 pwsh。
+#   配置文件 console-paths.json 里的 PWSH 仍可覆盖（覆盖逻辑在下面，顺序不变）。
+$mcPsHome = if ($PSHOME -and (Test-Path (Join-Path $PSHOME 'pwsh.exe'))) { Join-Path $PSHOME 'pwsh.exe' } else { '' }
+$mcPsMsi   = 'C:\Program Files\PowerShell\7\pwsh.exe'
+$mcPsPath   = if ((Get-Command pwsh -CommandType Application -ErrorAction SilentlyContinue)) { (Get-Command pwsh -CommandType Application -ErrorAction SilentlyContinue)[0].Source } else { '' }
+$PWSH       = if ($mcPsHome) { $mcPsHome } elseif (Test-Path $mcPsMsi) { $mcPsMsi } elseif ($mcPsPath) { $mcPsPath } else { '' }
 $WINCJS   = Join-Path $PACKDIR 'model-windows.cjs'
 $WINF     = Join-Path $PACKDIR 'console-windows.json'
 $SYSF     = Join-Path $PACKDIR 'console-syswindows.json'

@@ -63,6 +63,14 @@ exe 内嵌了 Windows 应用程序清单（`app.manifest`，951 字节）：
 
 **没做的事，说明原因**：清单里**故意不声明 DPI 感知**。界面用的是固定像素坐标，而且窗口是由 `pwsh.exe` 这个进程创建的（DPI 行为归 pwsh 自己的清单管）——在这里单方面声明只会让窗口在 150% 缩放下小一圈、内容挤爆，清晰度收益反而拿不到。所以**高缩放屏上文字仍是位图缩放（略糊）**，这条没变。
 
+### v29 修的真 bug：商店版 PowerShell 会让所有按钮报「系统找不到指定的文件」
+
+PowerShell 7 有两种装法：**MSI** 装在 `C:\Program Files\PowerShell\7\pwsh.exe`；**微软商店**装在 `C:\Users\<你>\AppData\Local\Microsoft\WindowsApps\Microsoft.PowerShell_...\pwsh.exe`。
+
+以前程序里写死了 MSI 那条路径。商店装的机器上那条路径**不存在** → 起停模型、自检、连「自检并修正路径」自己都起不来（它也要用 pwsh 起）→ 全部报系统原话「系统找不到指定的文件」，**看不出到底缺什么**，也就没法自救。
+
+现在改成**运行时自己找**：先看正在跑本脚本的那个 pwsh 在哪（最可靠），再试 MSI 路径，再试 PATH 里的 `pwsh`；`console-paths.json` 里的 `PWSH` 仍可覆盖。三条都找不到时会用人话告诉你：装 PowerShell 7（`winget install Microsoft.PowerShell`）或在配置里写 `PWSH`。
+
 ## 首次运行的两个提示 / Two first-run notes
 
 - **SmartScreen 说「未知发布者」**：这个版本**未数字签名**。右键 → 属性 → 取消勾选「解除锁定」，或直接接受警告。exe 的 SHA256 标在下载页与 `SHA256.txt`。
@@ -97,8 +105,8 @@ MIT（见 `LICENSE.txt`；`LICENSE-中文参考.txt` 是非官方中文参考，
 
 ## 下载 / Download
 
-看 **Releases**：`model-console-v28-windows.zip`（约 2.0 MB，含 exe + 两份示例配置（路径 / 模型清单）+ README + LICENSE + `SHA256.txt`）。
+看 **Releases**：`model-console-v29-windows.zip`（约 2.0 MB，含 exe + 两份示例配置（路径 / 模型清单）+ README + LICENSE + `SHA256.txt`）。
 
 ## 这个版本的状态 / Status
 
-v26 是**第一个对外发布版**；v27 把「模型清单」做成可外置（不改就跟以前一样）；v28 给 exe 加了应用程序清单（免费那条，**仍**未签名）。主要在我自己这台机器上日常使用（RTX 3090 + RTX 3080 双卡，Strata 引擎 + llama.cpp + OpenClaw）。**未签名**，**只在 Windows 上测过**。有问题欢迎开 issue。
+v26 是**第一个对外发布版**；v27 把「模型清单」做成可外置（不改就跟以前一样）；v28 给 exe 加了应用程序清单（免费那条，**仍**未签名）；**v29 修了一个真 bug**：PowerShell 7 若是从**微软商店**装的（不是 MSI），以前点任何按钮都报「系统找不到指定的文件」，见下节。主要在我自己这台机器上日常使用（RTX 3090 + RTX 3080 双卡，Strata 引擎 + llama.cpp + OpenClaw）。**未签名**，**只在 Windows 上测过**。有问题欢迎开 issue。

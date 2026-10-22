@@ -1,4 +1,4 @@
-# model-console.ps1 — 模型服务控制台 v28（按卡起停 · 页③下拉选模型 · 页④定时任务(要模型在上)+单个切换+心跳可切 · 页⑤功率(要管理员)+版本+链接 · 先弹窗后采集 · exe 内置程序文件+图标+版本信息 · 右上角 5 秒自动刷新）
+# model-console.ps1 — 模型服务控制台 v29（按卡起停 · 页③下拉选模型 · 页④定时任务(要模型在上)+单个切换+心跳可切 · 页⑤功率(要管理员)+版本+链接 · 先弹窗后采集 · exe 内置程序文件+图标+版本信息 · 右上角 5 秒自动刷新）
 # 源码改完必须重新编译：pwsh -File D:\06.AItools\model-console-build.ps1
 param([switch]$Test, [switch]$Layout, [string]$Shot = '', [int]$ShotPage = 1, [switch]$AutoRefresh, [switch]$NoPower)   # [2026-10-19 v17] -NoPower = 页⑤不读功率信息（显卡读不到时防崩）   # [2026-10-19 v13] -Shot <png> : 窗口自己截图后自动关闭（无鼠标、无黑框，用于自查美观）；-ShotPage 2 = 截页②；[2026-10-19 v16] -AutoRefresh = 打开后自动跑两个「刷新列表」（只读），配合 -Shot 自查列表能否真被填上
 $ErrorActionPreference = 'Continue'
@@ -16,7 +16,16 @@ $SELFJS   = Join-Path $PACKDIR 'model-detect.cjs'
 $SELFF    = Join-Path $PACKDIR 'console-selfcheck.json'
 $CALF     = Join-Path $PACKDIR 'console-calib.json'   # [2026-10-20 v22] 每档实测显存占用（自动校准，界面读）
 $RUN      = Join-Path $PACKDIR 'model-console-run.ps1'
-$PWSH     = 'C:\Program Files\PowerShell\7\pwsh.exe'
+# [2026-10-23 v29] PowerShell 7 的位置改成运行时自己解析（修「朋友机器点什么都报：系统找不到指定的文件」）
+#   朋友机器的 pwsh 是**微软商店版**（C:\Users\<用户>\AppData\Local\Microsoft\WindowsApps\...\pwsh.exe），
+#   而原来写死的默认值是 **MSI 版路径** C:\Program Files\PowerShell\7\pwsh.exe → 不存在 →
+#   Start-Process 直接报「系统找不到指定的文件」；连「自检并修正路径」自己都起不来（它也要用 pwsh 起）= 死锁。
+#   本脚本本身就是被 pwsh 跑的 → $PSHOME 就是真 pwsh 所在目录，最可靠；再退回 MSI 默认路径；再退回 PATH 里的 pwsh。
+#   配置文件 console-paths.json 里的 PWSH 仍可覆盖（覆盖逻辑在下面，顺序不变）。
+$mcPsHome = if ($PSHOME -and (Test-Path (Join-Path $PSHOME 'pwsh.exe'))) { Join-Path $PSHOME 'pwsh.exe' } else { '' }
+$mcPsMsi   = 'C:\Program Files\PowerShell\7\pwsh.exe'
+$mcPsPath   = if ((Get-Command pwsh -CommandType Application -ErrorAction SilentlyContinue)) { (Get-Command pwsh -CommandType Application -ErrorAction SilentlyContinue)[0].Source } else { '' }
+$PWSH       = if ($mcPsHome) { $mcPsHome } elseif (Test-Path $mcPsMsi) { $mcPsMsi } elseif ($mcPsPath) { $mcPsPath } else { '' }
 $LOGDIR   = Join-Path $PACKDIR 'logs'
 $TIER_DIR = 'D:\06.AItools\Strata'
 $STATEF   = Join-Path $PACKDIR 'console-state.json'
@@ -56,7 +65,7 @@ function LogErr([string]$m) {
     ((Get-Date -Format 'yyyy-MM-dd HH:mm:ss') + '  ' + $m) | Out-File -FilePath $RUNLOG -Append -Encoding UTF8 } catch {}
 }
 
-LogErr 'v28 启动（显卡识别前）'
+LogErr 'v29 启动（显卡识别前）'
 
 # ---------- 显卡自动识别 ----------
 $GPUS = @()
@@ -287,7 +296,7 @@ try {
   $TTL  = New-Object System.Drawing.Font('Microsoft YaHei', 10.5, [System.Drawing.FontStyle]::Bold)
 
   $frm = New-Object System.Windows.Forms.Form
-  $frm.Text = '模型服务控制台 v28'
+  $frm.Text = '模型服务控制台 v29'
   # [2026-10-19 v12] 上下留白修正：页内可用高实测 490（旧）→ 日志框底 506 被裁 16px
   #   窗口高 560 → 576（页内可用高 506），日志框底 506 = 页底，不再裁
   # [2026-10-19 v12] 上下留白修正：旧窗口高 560 → 页内可用高 490，日志框底 506 被裁 16px（看不到底部）
@@ -412,6 +421,12 @@ try {
     if ($key) { $argv += @('-Key', $key) }
     if ($gpu -ge 0) { $argv += @('-Gpu', $gpu) }
     if ($extra) { $argv += $extra }
+# [2026-10-23 v29] 找不到 pwsh 时说人话：原来直接让 Start-Process 甩系统原话「系统找不到指定的文件」，
+#   用户/用户看不出是 PowerShell 没找到，更不知道该怎么办（朋友机器上就是这么卡住的）。
+if (-not $PWSH -or -not (Test-Path $PWSH)) {
+      AppendLog((Get-Date -Format 'HH:mm:ss') + '  ' + $label + ' 起不来：找不到 PowerShell 7（pwsh.exe）。' + [char]10 + '    装一个：winget install Microsoft.PowerShell' + [char]10 + '    或在同目录 console-paths.json 里写 PWSH = pwsh.exe 的完整路径（反斜杠要写两个）' + [char]10)
+      return
+    }
     AppendLog((Get-Date -Format 'HH:mm:ss') + '  ' + $label + ' ...' + [char]10)
     try {
       $global:curProc = Start-Process -FilePath $PWSH -ArgumentList $argv -WindowStyle Hidden -PassThru `
