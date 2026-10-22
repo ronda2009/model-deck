@@ -840,7 +840,7 @@ if (-not $PWSH -or -not (Test-Path $PWSH)) {
     $f = [int]$txtFirst.Text; $l = [int]$txtLater.Text
     $msg = '安全垫：首卡 ' + $oF + ' → ' + $f + ' MiB，其它卡 ' + $oL + ' → ' + $l + ' MiB' + "`n" +
       '影响：五个档位配置被改写，大块头服务重启，正在跑的大块头请求中断。' + "`n" +
-      '备份：D:\06.AItools\Strata\.reserve-bak\' + "`n" +
+      '备份：' + $TIER_DIR + '\.reserve-bak\' + "`n" +
       '回滚：从备份拷回，再重启大块头。'
     $ans = [System.Windows.Forms.MessageBox]::Show($msg, '确认修改安全垫', [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Warning)
     if ($ans -ne [System.Windows.Forms.DialogResult]::Yes) { $txtFirst.Text = $oF; $txtLater.Text = $oL; return }
@@ -891,7 +891,7 @@ if (-not $PWSH -or -not (Test-Path $PWSH)) {
   $gbPad.Controls.Add($btnRoll)
   $gbPad.Controls.Add((LBL 12 164 440 20 '建议 1536 / 300（首卡 / 其它卡）'))
   $gbPad.Controls.Add((LBL 12 196 440 20 '写入对象：五个档位 JSON；改完自动重启大块头'))
-  $gbPad.Controls.Add((LBL 12 224 440 20 '备份：D:\06.AItools\Strata\.reserve-bak\'))
+  $gbPad.Controls.Add((LBL 12 224 440 20 ('备份：' + $TIER_DIR + '\.reserve-bak\')))
   $gbPad.Controls.Add((LBL 12 252 440 20 '回滚：从备份拷回 → 重启大块头'))
   $lblTierState2 = LBL 12 280 440 20 '档位端口：iq2x 8092 / q2x 8093 / iq3x 8095 / siq2x 8091 / siq3x 8094'
   $gbPad.Controls.Add($lblTierState2)
@@ -1417,7 +1417,7 @@ if (-not $PWSH -or -not (Test-Path $PWSH)) {
     $gbVer.Controls.Add($lk)
   }
   $gbVer.Controls.Add((LBL 12 240 440 20 '本机：OpenClaw 装在 npm 全局；Strata 引擎在'))
-  $gbVer.Controls.Add((LBL 12 268 440 20 'D:\06.AItools\Strata\engine\（BUILD.json 记版本）'))
+  $gbVer.Controls.Add((LBL 12 268 440 20 ('引擎目录：' + $TIER_DIR + '\engine\（BUILD.json 记版本）')))
   $gbVer.Controls.Add((LBL 12 296 440 20 '本页只读版本；升级在升级窗口做'))
   $t5.Controls.Add($gbVer)
 

@@ -1,13 +1,8 @@
-// model-scan.cjs — [2026-10-23 v30] 扫本机模型盘，把「清单里没有的 gguf」补进页① 启停清单
-// 为什么：原来页① 只有内置 11 条（用户机器上的模型），别人机器模型更多/更少就对不上。
-//   用户 2026-10-23：「第一页应该是扫描本地模型的清单，根据这个清单来判断启停，而不是固定的」
+// model-scan.cjs — [2026-10-23 v30] 扫本机模型盘，把清单里没有的 gguf 补进页① 启停清单
 // 用法：node model-scan.cjs --out console-tiers.scanned.json
-// 规则：
-//   · 扫 console-paths.json 里 MODELS 指的模型盘（没配就扫脚本所在盘常见位置），递归两层找 *.gguf
-//   · 跳过 mmproj（那是视觉模型的附属文件，不单独起）
-//   · 跳过清单里已经用到的 gguf（界面/执行器读同一份扫描结果，重复列没意义）
-//   · 名字里带 vl/vision/clip 的当视觉条目（act=vl），其余当对话条目（act=27b，走 :8090 路由）
-//   · 显存门槛按文件大小粗估：文件 GiB×1024 + 2048（上下文与运行时开销），界面还会用实测校准覆盖
+// 规则：扫 console-paths.json 的 MODELS（没配就扫常见位置），递归两层找 *.gguf；
+//   跳过 mmproj 与清单里已用到的；名字带 vl/vision/clip 的当视觉条目，其余当对话条目；
+//   显存门槛按文件大小粗估（GiB×1024 + 2048），界面再用实测校准覆盖
 const fs = require('node:fs');
 const path = require('node:path');
 

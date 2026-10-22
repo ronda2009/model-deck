@@ -348,7 +348,7 @@ function OfficialStart([string]$tier) {
     $cfgs = @()
     try { $cfgs = @(Get-ChildItem -LiteralPath $TIER_DIR -Filter '*.json' -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -like ('*' + $tier + '*') }) } catch { }
     if (-not $py -or -not (Test-Path $srv) -or $cfgs.Count -eq 0) {
-      Write-Host ('   ✗ 这台机器没有本助手的自建路由，也没找到官方起法需要的东西（要 ' + $TIER_DIR + '\serve\server.py + 档位 ' + $tier + ' 的 json + python）')
+      Write-Host ('   ✗ 这台机器没有自建路由（strata-router.py），也没找到官方起法需要的东西（要 ' + $TIER_DIR + '\serve\server.py + 档位 ' + $tier + ' 的 json + python）')
       Write-Host '     改 console-paths.json 的 TIER_DIR 指向 Strata 目录，或先用 Strata 自己的方式把模型起起来'
       return $false
     }
