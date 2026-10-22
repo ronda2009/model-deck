@@ -75,6 +75,18 @@ exe 内嵌了 Windows 应用程序清单（`app.manifest`，951 字节）：
 - 显存门槛用**实测值**（自动校准），不是猜的。
 - 只动你点的那个对象，不批量改全局。
 
+## 打赏 / Buy me a coffee
+
+软件免费。如果它帮你省了时间，可以请作者喝杯咖啡 🙂
+
+<a href="https://qr.alipay.com/fkx13840f42u5aj2vrhkh5c"><img src="docs/donate/alipay-qr.jpg" width="240" alt="支付宝收款码 / Alipay QR" /></a>
+
+扫码或[点这个链接直达付款页](https://qr.alipay.com/fkx13840f42u5aj2vrhkh5c)。
+
+为什么不用 GitHub Sponsors：实测 GitHub 官方「支持地区」清单里**没有中国大陆**，中国大陆账号目前开不了官方收款（只能排 waitlist）；而且国内朋友得有国际 Visa/MasterCard 才能付，银联不行。所以这里挂的是支付宝收款码。
+
+---
+
 ## 许可 / License
 
 MIT（见 `LICENSE.txt`；`LICENSE-中文参考.txt` 是非官方中文参考，以英文原文为准）。
