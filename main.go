@@ -40,6 +40,8 @@ var packedNames = []string{
 	"model-versions.cjs",
 	"model-hb.cjs",
 	"model-detect.cjs",
+	// [2026-10-23 v30] 本机模型清单扫描器：页① 靠它把「清单里没列的 gguf」补进来（老板要求扫本机清单）
+	"model-scan.cjs",
 	"console-paths.json",
 	"README.txt",
 	"打开控制台.vbs",

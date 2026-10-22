@@ -1,4 +1,4 @@
-# model-console.ps1 — 模型服务控制台 v29（按卡起停 · 页③下拉选模型 · 页④定时任务(要模型在上)+单个切换+心跳可切 · 页⑤功率(要管理员)+版本+链接 · 先弹窗后采集 · exe 内置程序文件+图标+版本信息 · 右上角 5 秒自动刷新）
+# model-console.ps1 — 模型服务控制台 v30（按卡起停 · 页③下拉选模型 · 页④定时任务(要模型在上)+单个切换+心跳可切 · 页⑤功率(要管理员)+版本+链接 · 先弹窗后采集 · exe 内置程序文件+图标+版本信息 · 右上角 5 秒自动刷新）
 # 源码改完必须重新编译：pwsh -File D:\06.AItools\model-console-build.ps1
 param([switch]$Test, [switch]$Layout, [string]$Shot = '', [int]$ShotPage = 1, [switch]$AutoRefresh, [switch]$NoPower)   # [2026-10-19 v17] -NoPower = 页⑤不读功率信息（显卡读不到时防崩）   # [2026-10-19 v13] -Shot <png> : 窗口自己截图后自动关闭（无鼠标、无黑框，用于自查美观）；-ShotPage 2 = 截页②；[2026-10-19 v16] -AutoRefresh = 打开后自动跑两个「刷新列表」（只读），配合 -Shot 自查列表能否真被填上
 $ErrorActionPreference = 'Continue'
@@ -16,12 +16,8 @@ $SELFJS   = Join-Path $PACKDIR 'model-detect.cjs'
 $SELFF    = Join-Path $PACKDIR 'console-selfcheck.json'
 $CALF     = Join-Path $PACKDIR 'console-calib.json'   # [2026-10-20 v22] 每档实测显存占用（自动校准，界面读）
 $RUN      = Join-Path $PACKDIR 'model-console-run.ps1'
-# [2026-10-23 v29] PowerShell 7 的位置改成运行时自己解析（修「朋友机器点什么都报：系统找不到指定的文件」）
-#   朋友机器的 pwsh 是**微软商店版**（C:\Users\<用户>\AppData\Local\Microsoft\WindowsApps\...\pwsh.exe），
-#   而原来写死的默认值是 **MSI 版路径** C:\Program Files\PowerShell\7\pwsh.exe → 不存在 →
-#   Start-Process 直接报「系统找不到指定的文件」；连「自检并修正路径」自己都起不来（它也要用 pwsh 起）= 死锁。
-#   本脚本本身就是被 pwsh 跑的 → $PSHOME 就是真 pwsh 所在目录，最可靠；再退回 MSI 默认路径；再退回 PATH 里的 pwsh。
-#   配置文件 console-paths.json 里的 PWSH 仍可覆盖（覆盖逻辑在下面，顺序不变）。
+# [2026-10-23 v29] pwsh 位置运行时解析：商店版装在 WindowsApps 下，写死 MSI 路径在别人机器上不存在，
+#   点任何按钮都报「系统找不到指定的文件」。顺序 $PSHOME → MSI 默认 → PATH；console-paths.json 的 PWSH 可覆盖。
 $mcPsHome = if ($PSHOME -and (Test-Path (Join-Path $PSHOME 'pwsh.exe'))) { Join-Path $PSHOME 'pwsh.exe' } else { '' }
 $mcPsMsi   = 'C:\Program Files\PowerShell\7\pwsh.exe'
 $mcPsPath   = if ((Get-Command pwsh -CommandType Application -ErrorAction SilentlyContinue)) { (Get-Command pwsh -CommandType Application -ErrorAction SilentlyContinue)[0].Source } else { '' }
@@ -65,7 +61,7 @@ function LogErr([string]$m) {
     ((Get-Date -Format 'yyyy-MM-dd HH:mm:ss') + '  ' + $m) | Out-File -FilePath $RUNLOG -Append -Encoding UTF8 } catch {}
 }
 
-LogErr 'v29 启动（显卡识别前）'
+LogErr 'v30 启动（显卡识别前）'
 
 # ---------- 显卡自动识别 ----------
 $GPUS = @()
@@ -115,9 +111,7 @@ $RES = ReadReserve
 function CardReserve([int]$id) { if ($id -eq $FIRST_CARD_ID) { return $RES.first } return $RES.later }
 
 # ---------- 模型表（顺序同旧 bat 菜单） ----------
-# [2026-10-22 v27] 清单可以外置：同目录有 console-tiers.json 且读得进去就用它，
-#   没这文件 / 读不了 / 没有有效条目 → 用下面的内置表（本机就是这种情况，行为不变）。
-#   想要自己的清单：把 console-tiers.example.json 复制成 console-tiers.json 再改内容。
+# [2026-10-22 v27] 同目录有 console-tiers.json 就用它（复制 console-tiers.example.json 改内容）；读不到用下面的内置表。
 $MODELS_DEF = @(
   # Need = 两卡合计需占用 MiB。Q2X 为实测（2026-10-19 09:05 运行中：3090 用 23713 + 3080 用 16734 = 40447）；
   # 其余四档同基座模型，引擎按可用显存自适应，暂同值，待各档真起后用 nvidia-smi 校准。
@@ -126,12 +120,12 @@ $MODELS_DEF = @(
   [pscustomobject]@{ Key='iq3x';  Name='大块头 IQ3X（无删减 IQ3_XXS）';     Need=40450; Dual=$true;  Act='big'  }
   [pscustomobject]@{ Key='siq2x'; Name='S-IQ2x（Swift 无删减 IQ2_XS）';     Need=40450; Dual=$true;  Act='big'  }
   [pscustomobject]@{ Key='siq3x'; Name='S-IQ3x（Swift 无删减 IQ3_S）';      Need=40450; Dual=$true;  Act='big'  }
-  [pscustomobject]@{ Key='c390';  Name='Qwen3.8-27B-coder390（编程27B）';                  Need=19000; Dual=$false; Act='27b'  }
-  [pscustomobject]@{ Key='under'; Name='Qwen3.8-27B-GSQ-RCO（Underdog）';                  Need=8200;  Dual=$false; Act='27b'  }
-  [pscustomobject]@{ Key='j27bx'; Name='Qwen3.8-27B-Abl（J27bX）';                         Need=16300; Dual=$false; Act='27b'  }
-  [pscustomobject]@{ Key='b27bx'; Name='Qwen3.8-27B-BF16（B27bX）';                        Need=16300; Dual=$false; Act='27b'  }
-  [pscustomobject]@{ Key='b27ks'; Name='Qwen3.8-27B-BF16-ks（B27bX-ks）';                  Need=15400; Dual=$false; Act='27b'  }
-  [pscustomobject]@{ Key='vl8';   Name='Qwen3-VL-8B-Q8_0（视觉·调图）';                     Need=9200;  Dual=$false; Act='vl'   }   # [2026-10-19 v14] 原名带 Instruct- 太长，240px 标签装不下被截断 → 缩短
+  [pscustomobject]@{ Key='c390';  Name='Qwen3.8-27B-coder390（编程27B）';                  Need=19000; Dual=$false; Act='27b'; Gguf='coder390-27b.gguf' }
+  [pscustomobject]@{ Key='under'; Name='Qwen3.8-27B-GSQ-RCO（Underdog）';                  Need=8200;  Dual=$false; Act='27b'; Gguf='underdog-27b.gguf' }
+  [pscustomobject]@{ Key='j27bx'; Name='Qwen3.8-27B-Abl（J27bX）';                         Need=16300; Dual=$false; Act='27b'; Gguf='j27bx.gguf' }
+  [pscustomobject]@{ Key='b27bx'; Name='Qwen3.8-27B-BF16（B27bX）';                        Need=16300; Dual=$false; Act='27b'; Gguf='b27bx.gguf' }
+  [pscustomobject]@{ Key='b27ks'; Name='Qwen3.8-27B-BF16-ks（B27bX-ks）';                  Need=15400; Dual=$false; Act='27b'; Gguf='b27bx-ks.gguf' }
+  [pscustomobject]@{ Key='vl8';   Name='Qwen3-VL-8B-Q8_0（视觉·调图）';                     Need=9200;  Dual=$false; Act='vl';  Gguf='Qwen3-VL-8B-Instruct-Unredacted-MAX.Q8_0.gguf' }   # [2026-10-19 v14] 原名带 Instruct- 太长，240px 标签装不下被截断 → 缩短
 )
 $MODELS = $MODELS_DEF
 if (Test-Path $MODELSF) {
@@ -146,11 +140,76 @@ if (Test-Path $MODELSF) {
       if ('big','27b','vl' -notcontains [string]$e.act) { LogErr ('档位清单里 ' + $k + ' 的 act 不认识（要 big / 27b / vl），已跳过：' + [string]$e.act); continue }
       if ([int]$e.need -le 0) { LogErr ('档位清单里 ' + $k + ' 的 need 不是正数，已跳过：' + $k); continue }
       $seen[$k] = $true
-      $arr += [pscustomobject]@{ Key = $k; Name = [string]$e.name; Need = [int]$e.need; Dual = [bool]$e.dual; Act = [string]$e.act; Tier = [string]$e.tier; Port = [int]$e.port }
+      $arr += [pscustomobject]@{ Key = $k; Name = [string]$e.name; Need = [int]$e.need; Dual = [bool]$e.dual; Act = [string]$e.act; Tier = [string]$e.tier; Port = [int]$e.port; Gguf = [string]$e.gguf }
     }
     if ($arr.Count -gt 0) { $MODELS = $arr; LogErr ('档位清单读自 console-tiers.json（' + $arr.Count + ' 个）') }
     else { LogErr '档位清单 console-tiers.json 里没有有效条目，本次改用内置表' }
   } catch { LogErr ('档位清单 console-tiers.json 读不了（多半是 JSON 写法不对：Windows 路径的反斜杠要写两个）：' + $_.Exception.Message + ' —— 本次改用内置表') }
+}
+
+# ---------- [2026-10-23 v30] 本机模型清单：扫模型盘，把内置清单没有的模型补进页① ----------
+#   没有 console-tiers.scanned.json 就跑 model-scan.cjs 扫一次，要重扫就删掉它。
+#   只做补充，不覆盖手写的 console-tiers.json（那份优先）。
+$SCANJS = Join-Path $PACKDIR 'model-scan.cjs'
+$SCNF   = Join-Path $PACKDIR 'console-tiers.scanned.json'
+if (-not (Test-Path $SCNF) -and (Test-Path $SCANJS)) {
+  try {
+    LogErr '本机模型清单：开始扫描模型盘（首次启动扫一次，之后读缓存；删 console-tiers.scanned.json 可重扫）'
+    $null = & $NODE $SCANJS --out $SCNF 2>&1
+  } catch { LogErr ('本机模型清单扫描失败（内置清单照用，不影响）：' + $_.Exception.Message) }
+}
+if (Test-Path $SCNF) {
+  try {
+    $sj = Get-Content $SCNF -Raw -Encoding UTF8 | ConvertFrom-Json
+    $seen2 = @{}
+    foreach ($m in $MODELS) { $seen2[[string]$m.Key] = $true }
+    $addN = 0
+    foreach ($e in @($sj.entries)) {
+      $k = [string]$e.key
+      if (-not $k) { continue }
+      if ($seen2[$k]) { continue }                                        # 内置/手写清单里已有 → 不重复列
+      if ('big','27b','vl' -notcontains [string]$e.act) { continue }
+      if ([int]$e.need -le 0) { continue }
+      $seen2[$k] = $true
+      $MODELS += [pscustomobject]@{ Key = $k; Name = [string]$e.name; Need = [int]$e.need; Dual = [bool]$e.dual; Act = [string]$e.act; Tier = [string]$e.tier; Port = [int]$e.port; Gguf = [string]$e.gguf }
+      $addN++
+    }
+    if ($addN -gt 0) { LogErr ('本机模型清单：扫到内置清单没有的模型 ' + $addN + ' 个，已补进页①（共 ' + $MODELS.Count + ' 条）') }
+  } catch { LogErr ('本机扫描清单读不了（删掉 console-tiers.scanned.json 会自动重扫）：' + $_.Exception.Message) }
+}
+
+# ---------- [2026-10-23 v30] 本机到底有没有这个模型 ----------
+#   内置清单是我这台机器的模型；别人机器上这些模型可能根本没有，原来照样列出来还写「可起」，点了才知道没文件。
+#   big 档：看引擎目录里有没有这个档（strata-<档>.json 或 run-<档>.bat）；27b/视觉：看模型盘里有没有那个 gguf。
+#   目录本身不存在 → 判「不知道」（不标灰），避免在别人机器上把全部条误标灰。结果缓存在 $global:PRESENT。
+$global:PRESENT = @{}
+$GGUFROOTS = @($MODELDISK, $PACKDIR)
+if (Test-Path $SCNF) {
+  try {
+    $sr = [string]((Get-Content $SCNF -Raw -Encoding UTF8 | ConvertFrom-Json).'__扫描根')
+    if ($sr) { $GGUFROOTS = @($sr) + $GGUFROOTS }
+  } catch { }
+}
+function ScanPresent {
+  $h = @{}
+  $roots = @($GGUFROOTS | Where-Object { $_ -and (Test-Path $_) })
+  $tierOk = Test-Path $TIER_DIR
+  foreach ($m in $MODELS) {
+    $ok = $null                                       # $null = 判不了（不标灰）
+    if ($m.Act -eq 'big') {
+      if ($tierOk) {
+        $t = TierOf $m.Key
+        $ok = (Test-Path (Join-Path $TIER_DIR ('strata-' + $t + '.json'))) -or (Test-Path (Join-Path $TIER_DIR ('run-' + $t + '.bat')))
+      }
+    } elseif ($m.Gguf) {
+      if ($roots.Count -gt 0) {
+        $ok = $false
+        foreach ($r in $roots) { if (Test-Path (Join-Path $r ([string]$m.Gguf))) { $ok = $true; break } }
+      }
+    }
+    $h[[string]$m.Key] = $ok
+  }
+  $global:PRESENT = $h
 }
 
 # [2026-10-19 v14] 端口检查提速：实测 4 次 `Get-NetTCPConnection -LocalPort` = 2046 ms，
@@ -172,6 +231,22 @@ function ScanPorts {
 }
 ScanPorts
 function Up([int]$port) { return $LISTEN.ContainsKey([string]$port) }
+# [2026-10-23 v30] 大块头端口不写死：8080 只是我这台自建路由的口，官方 Strata 默认是 8095。
+#   配置 BIGPORT 优先；那个口没在听就从正在监听的口里找「回 /health 且 service=strata」的那个。
+#   只在启动和点「刷新」时探（5 秒定时器里同步等 HTTP 会重演 v25 卡死）。
+if (-not $BIGPORT) { $BIGPORT = 8080 }
+$global:BIGPORT = [int]$BIGPORT
+function BigPortProbe {
+  $cands = @($global:BIGPORT, 8080, 8095, 8081, 8082, 8100) | Select-Object -Unique
+  foreach ($p in $cands) {
+    if (-not (Up $p)) { continue }
+    try {
+      $hv = Invoke-WebRequest ('http://127.0.0.1:' + $p + '/health') -TimeoutSec 1 -UseBasicParsing | ConvertFrom-Json
+      if ($hv -and $hv.service -eq 'strata') { $global:BIGPORT = [int]$p; return }
+    } catch { }
+  }
+}
+BigPortProbe   # 窗口还没显示就先探好（顶部链接与页⑥入口在建窗口时就要用对端口）
 function PortPidOf([int]$port) {
   $k = [string]$port
   if ($LISTEN.ContainsKey($k)) { return $LISTEN[$k] }
@@ -185,30 +260,71 @@ function LiveFree {
   }
   return $out
 }
-# [2026-10-21 v25] 卡死修复（用户：「用控制台停了大模型，窗口就卡死了，再打开也是卡死」）
-#   旧写法在界面线程上同步等 :8080，超时 6 秒。服务刚被停时端口常处于「接了但不回话」的半开状态，
-#   实测每次 6049ms；5 秒定时器 + 刷新按钮都要等 → 一次刷新 6453ms > 5000ms，界面消息永远处理不完
-#   = 卡死；重开时状态没变 → 同样卡（探针 脚本\探针\probe-freeze2.ps1 / probe-v25-async2.ps1）。
-#   现在：后台发起 + 界面线程最多等 150 毫秒（实测半开时单次最大 170ms），没回来先用上一次的值；
-#   3 秒 HttpClient 超时后自动置 null → 界面显示「未在跑」。界面线程不再被网络拖住。
+# [2026-10-21 v25] 状态不能在界面线程同步死等 :8080 —— 服务刚停时端口半开，一次要等 6 秒，比 5 秒定时器还长 → 卡死。
+#   现在后台发起、界面线程最多等 150ms，没回来先用上一次的值；3 秒超时后置空，界面才显示「未在跑」。
 Add-Type -AssemblyName System.Net.Http
 if (-not $global:HTTP8080) {
   $global:HTTP8080 = New-Object System.Net.Http.HttpClient
   $global:HTTP8080.Timeout = [TimeSpan]::FromMilliseconds(3000)
 }
 $global:STask = $null
+$global:STask2 = $null
 $global:ST = $null
+# [2026-10-23 v30] /__status 是自建路由的私有接口，官方 Strata 没有它 → 别人机器上 404，页① 永远显示「无」。
+#   两条路：先 /__status，问不到再问官方自带的 /health（回 model 与 loaded），拼成同形状对象给下游。
+function TierFromModel([string]$m) {
+  # 官方 /health 只给模型名（如 qwen3.8-flash-next-iq3x），把它对回清单里的档位名
+  if (-not $m) { return '' }
+  $mm = ([string]$m).ToLower()
+  $tiers = @()
+  foreach ($x in $MODELS) {
+    if ($x.Act -ne 'big') { continue }
+    $t = ([string](TierOf $x.Key)).ToLower()
+    if ($t -and ($tiers -notcontains $t)) { $tiers += $t }
+  }
+  # 先精确/后缀匹配；第二轮按名字从长到短（q2x 是 siq2x 的子串，顺序反了会认错）
+  foreach ($t in $tiers) { if ($mm -eq $t -or $mm.EndsWith('-' + $t)) { return $t } }
+  foreach ($t in ($tiers | Sort-Object { $_.Length } -Descending)) { if ($mm.Contains($t)) { return $t } }
+  return $m   # 对不上就直接报模型名原文 —— 总之不再显示「无」
+}
+# [2026-10-23 v30b] 任务失败（404/连不上）时 $task.Wait() 会抛异常，把后面的兜底整段跳过 → 等任务单独包住。
+function WaitTask($task, [int]$ms) {
+  try { if ($task -and -not $task.IsCompleted) { $null = $task.Wait($ms) } } catch { }
+}
 function StrataStatus {
   try {
-    if (-not $global:STask) { $global:STask = $global:HTTP8080.GetStringAsync('http://127.0.0.1:8080/__status') }
-    $done = $true
-    if (-not $global:STask.IsCompleted) { $done = $global:STask.Wait(150) }
+    if (-not $global:STask) { $global:STask = $global:HTTP8080.GetStringAsync('http://127.0.0.1:' + $global:BIGPORT + '/__status') }
+    WaitTask $global:STask 150
     if ($global:STask.IsCompleted) {
       if ($global:STask.Status -eq 'RanToCompletion') { $global:ST = ($global:STask.Result | ConvertFrom-Json) }
       else { $global:ST = $null }   # 连不上/超时/没回话 → 明确置空，界面才会显示「未在跑」
       $global:STask = $null
     }
-  } catch { $global:STask = $null; $global:ST = $null }
+    if (-not $global:ST) {
+      # /__status 问不到（多半是官方 Strata）→ 改问官方自带的 /health
+      if (-not $global:STask2) { $global:STask2 = $global:HTTP8080.GetStringAsync('http://127.0.0.1:' + $global:BIGPORT + '/health') }
+      WaitTask $global:STask2 150
+      if ($global:STask2.IsCompleted) {
+        if ($global:STask2.Status -eq 'RanToCompletion') {
+          $hv = $null
+          try { $hv = ($global:STask2.Result | ConvertFrom-Json) } catch { $hv = $null }
+          $global:STask2 = $null
+          if ($hv -and $hv.model) {
+            $ld = $true   # 老引擎没回 loaded 字段时不误判成「没跑」
+            if ($hv.PSObject.Properties['loaded']) { $ld = [bool]$hv.loaded }
+            if ($ld) {
+              $global:ST = [pscustomobject]@{
+                current  = (TierFromModel ([string]$hv.model))
+                model    = [string]$hv.model
+                pid      = (PortPidOf $global:BIGPORT)
+                official = $true
+              }
+            } else { $global:ST = $null }
+          }
+        } else { $global:STask2 = $null }   # 连不上/404 → 置空，别把上一次的旧值一直挂着
+      }
+    }
+  } catch { $global:STask = $null; $global:STask2 = $null }
   return $global:ST
 }
 function StateFile {
@@ -225,6 +341,7 @@ function TierOf($key) {
   foreach ($m in $MODELS) { if ([string]$m.Key -eq [string]$key -and $m.Tier) { return [string]$m.Tier } }
   switch ($key) { 'iq2x' { return 'iq2x' } 'q2x' { return 'q2x' } 'iq3x' { return 'iq3x' } 'siq2x' { return 'siq2x' } 'siq3x' { return 'siq3x' } default { return 'x' } }
 }
+ScanPresent   # [2026-10-23 v30] 必须在 TierOf 之后跑（big 档要靠它认档位名）
 function RunningMap {  # [2026-10-19 v14] 可传入已读到的状态，避免同一轮里两次调 :8080/__status
   param($sPre = $null)
   $map = @{}
@@ -296,11 +413,8 @@ try {
   $TTL  = New-Object System.Drawing.Font('Microsoft YaHei', 10.5, [System.Drawing.FontStyle]::Bold)
 
   $frm = New-Object System.Windows.Forms.Form
-  $frm.Text = '模型服务控制台 v29'
-  # [2026-10-19 v12] 上下留白修正：页内可用高实测 490（旧）→ 日志框底 506 被裁 16px
-  #   窗口高 560 → 576（页内可用高 506），日志框底 506 = 页底，不再裁
-  # [2026-10-19 v12] 上下留白修正：旧窗口高 560 → 页内可用高 490，日志框底 506 被裁 16px（看不到底部）
-  #   新：高 620（页内可用高 360 + 日志框共 170 放在两页共用的底部），不再裁；仍不可拖动
+  $frm.Text = '模型服务控制台 v30'
+  # 窗口固定 1000x620、不可拖动：页内可用高 360，日志框 170 放在两页共用的底部
   $frm.Width = 1000
   $frm.Height = 620
   $frm.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
@@ -316,7 +430,7 @@ try {
   #   → 这一行最左边放可点链接（:8080 监控台），状态文字整体往右挪；链接与状态条都在按钮上方
   $hdrLink = New-Object System.Windows.Forms.LinkLabel
   $hdrLink.Text = 'Strata 监控'
-  $hdrLink.Tag = 'http://127.0.0.1:8080/'
+  $hdrLink.Tag = ('http://127.0.0.1:' + $global:BIGPORT + '/')
   $hdrLink.Location = [System.Drawing.Point]::new(8, 10)
   $hdrLink.Size = [System.Drawing.Size]::new(112, 24)
   $hdrLink.Font = New-Object System.Drawing.Font('Microsoft YaHei', 11, [System.Drawing.FontStyle]::Bold)
@@ -375,10 +489,7 @@ try {
   $global:curStart = $null   # [2026-10-21 v23] 占用提示要说「已跑几秒」
 
   $outBox = New-Object System.Windows.Forms.TextBox
-  # [2026-10-19 v12] 日志框从页①内部移到窗口底部（两页共用，切到页②也能看到回显）
-  # [2026-10-19 v13] 日志框与卡片网格对齐：卡片块在客户区 x=20..964（标签页内缩 4 + 卡片左边 8），
-  #   旧值 x=8 宽 984 → 右边被裁 8px、比卡片宽出 12px，看起来「贴右墙」；现在 x=20 宽 944 → 与卡片左右齐平
-  #   高 168 → 167：底 573，下留白 8（与上 8、左 20、右 20 的网格一致）
+  # 日志框在窗口底部、与卡片左右齐平（x=20 宽 944），两页共用
   $outBox.Location = [System.Drawing.Point]::new(20, 440)
   $outBox.Size = [System.Drawing.Size]::new(944, 148)
   $outBox.Multiline = $true
@@ -502,6 +613,8 @@ if (-not $PWSH -or -not (Test-Path $PWSH)) {
   #   现在：重扫端口 + 重量两卡显存 + 重读当前模型 + 重读内存 + 刷右上角，并在日志框回显耗时。
   $btnRefresh.Add_Click({
     $swr = [Diagnostics.Stopwatch]::StartNew()
+    try { if (-not (Up $global:BIGPORT)) { BigPortProbe } } catch { }
+    try { ScanPresent } catch { }   # 手动刷新时重判一次「本机有没有这个模型」（拷进来新模型不用重开程序）
     RefreshState
     AppendLog((Get-Date -Format 'HH:mm:ss') + '  手动刷新完成（' + [int]$swr.Elapsed.TotalMilliseconds + 'ms）：显存 / 内存 / 当前模型 / 端口 已重扫' + [char]10)
   })
@@ -519,13 +632,62 @@ if (-not $PWSH -or -not (Test-Path $PWSH)) {
   foreach ($idx in 0..([Math]::Min($GPUS.Count, 2) - 1)) {
     $g = $GPUS[$idx]
     $gb = GB $colX[$idx] 32 $GBW 300 ('显卡' + $g.Id + '  ' + $g.Name + '  ' + $g.GB + ' GB')
+    # [2026-10-23 v30] 模型多时框内出竖向滚动条；条目少时位置与旧版逐像素相同。
+    #   两层面板：外层裁剪、内层被移动（只有一层时超出的行会被自己裁掉，滚不出来）。
+    #   不用 AutoScroll：它会在竖向条出现后再冒一条横向条，HorizontalScroll.Visible=$false 压不住。
+    $rowClip = New-Object System.Windows.Forms.Panel                       # 外层：窗口，固定高，负责裁剪
+    $rowClip.Location = [System.Drawing.Point]::new(4, 20)
+    $rowClip.Size = [System.Drawing.Size]::new(($GBW - 27), 280)          # 441：留 17 给滚动条 + 2 边距
+    $rowPanel = New-Object System.Windows.Forms.Panel                     # 内层：内容，高度=全部行，被滚动移动
+    $rowPanel.Location = [System.Drawing.Point]::new(0, 0)
+    $rowPanel.Size = [System.Drawing.Size]::new(($GBW - 27), 280)
+    $rowClip.Controls.Add($rowPanel)
+    $rowScroll = New-Object System.Windows.Forms.VScrollBar
+    $rowScroll.Location = [System.Drawing.Point]::new(($GBW - 25), 20)
+    $rowScroll.Size = [System.Drawing.Size]::new(17, 280)
+    $rowScroll.Minimum = 0
+    $rowScroll.SmallChange = 25
+    $rowScroll.LargeChange = 200
+    $rowScroll.Tag = $rowPanel
+    $rowPanel.Tag = $rowScroll
+    $rowClip.Tag = $rowScroll
+    # 滚动只做一件事：把内层往上挪 Value 像素（外层不动，所以超出外层的行被裁掉、看不见的行进来）
+    $rowScroll.Add_Scroll({
+      $p = $args[0].Tag
+      if ($p) { $p.Location = [System.Drawing.Point]::new($p.Location.X, (0 - $args[0].Value)) }
+    })
+    $rowPanel.Add_MouseWheel({
+      $sb = $args[0].Tag
+      if ($sb -and $sb.Visible) {
+        $mx = ($sb.Maximum - $sb.LargeChange + 1)
+        $nv = $sb.Value - ([Math]::Sign($args[0].Delta) * 50)
+        if ($nv -lt $sb.Minimum) { $nv = $sb.Minimum }
+        if ($nv -gt $mx) { $nv = $mx }
+        $sb.Value = $nv
+        $args[0].Location = [System.Drawing.Point]::new($args[0].Location.X, (0 - $nv))
+      }
+    })
+    $rowClip.Add_MouseWheel({
+      $sb = $args[0].Tag
+      if ($sb -and $sb.Visible) {
+        $mx = ($sb.Maximum - $sb.LargeChange + 1)
+        $nv = $sb.Value - ([Math]::Sign($args[0].Delta) * 50)
+        if ($nv -lt $sb.Minimum) { $nv = $sb.Minimum }
+        if ($nv -gt $mx) { $nv = $mx }
+        $sb.Value = $nv
+        $ip = $args[0].Controls[0]
+        if ($ip) { $ip.Location = [System.Drawing.Point]::new($ip.Location.X, (0 - $nv)) }
+      }
+    })
+    $gb.Controls.Add($rowClip)
+    $gb.Controls.Add($rowScroll)
     $i = 0
     foreach ($m in $MODELS) {
-      $yy = 20 + $i * 25
-      $gb.Controls.Add((LBL 8 $yy 240 20 $m.Name))
+      $yy = $i * 25
+      $rowPanel.Controls.Add((LBL 8 $yy 240 20 $m.Name))
       $bs = BTN 250 $yy 44 22 '起'
       $bp = BTN 296 $yy 44 22 '停'
-      $sl = LBL 344 $yy 116 20 ''
+      $sl = LBL 344 $yy 96 20 ''
       $bs.Tag = [pscustomobject]@{ key = $m.Key; gid = $g.Id; name = $m.Name; act = $m.Act }
       $bp.Tag = [pscustomobject]@{ key = $m.Key; gid = $g.Id; name = $m.Name; act = $m.Act }
       $bs.Add_Click({
@@ -538,11 +700,22 @@ if (-not $PWSH -or -not (Test-Path $PWSH)) {
         $ans = [System.Windows.Forms.MessageBox]::Show('停 ' + $t.name + '（显卡' + $t.gid + '）' + "`n" + '该模型从显存卸载，正在用它对话的请求会中断。其它模型不受影响。', '确认', [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Warning)
         if ($ans -eq [System.Windows.Forms.DialogResult]::Yes) { RunAction ('stop-' + $t.act) $t.key ($t.gid - 1) ('停 ' + $t.name) $null }
       })
-      $gb.Controls.Add($bs); $gb.Controls.Add($bp); $gb.Controls.Add($sl)
+      $rowPanel.Controls.Add($bs); $rowPanel.Controls.Add($bp); $rowPanel.Controls.Add($sl)
       $rowStart[[string]$g.Id + '_' + $m.Key] = $bs
       $rowStop[[string]$g.Id + '_' + $m.Key]  = $bp
       $rowStat[[string]$g.Id + '_' + $m.Key]  = $sl
       $i++
+    }
+    # 内层高度 = 全部行总高；Maximum 多加 199 是因为 UI 拖到底的值 = Maximum - LargeChange + 1
+    $contentPx = $i * 25 + 4
+    $rowPanel.Size = [System.Drawing.Size]::new(($GBW - 27), [Math]::Max(280, $contentPx))
+    $needPx = $contentPx - 280
+    if ($needPx -gt 0) {
+      $rowScroll.Maximum = ($needPx + 199)
+      $rowScroll.Visible = $true
+    } else {
+      $rowScroll.Maximum = 0
+      $rowScroll.Visible = $false
     }
     $t1.Controls.Add($gb)
   }
@@ -556,7 +729,13 @@ if (-not $PWSH -or -not (Test-Path $PWSH)) {
     $global:FREE = $live   # [2026-10-21 v23] 用户：「点刷新上面的显卡/内存不动」——把刚量到的显存直接交给右上角复用，不再各查各的
     $map = RunningMap $s
     $parts = @()
-    if ($s) { $parts += ('大块头 ' + $s.current + ' 运行中（占两卡）') } else { $parts += '大块头 停' }
+    # [2026-10-23 v30] 「占两卡」是我机器（3090+3080 双卡换档）才成立的说法，别人单卡机器不适用 → 去掉；
+    #   档位名对不上时（外置清单/别人的模型名）直接显示引擎报的真实模型名
+    if ($s) {
+      $cur = [string]$s.current
+      if ($s.model -and $s.model -ne $cur) { $cur = ($cur + '（' + [string]$s.model + '）') }
+      $parts += ('大块头 ' + $cur + ' 运行中')
+    } else { $parts += '大块头 停' }
     if (Up 8090) { $parts += '27B 运行中' }
     # [2026-10-22 v27] 同上：按清单里 act=vl 的条目判（内置条目没给 port 时用 8096）
     foreach ($m in $MODELS) {
@@ -575,9 +754,9 @@ if (-not $PWSH -or -not (Test-Path $PWSH)) {
       else { $lblGwState.Text = '网关 :18789 未在跑' }
     } catch { $lblGwState.Text = '网关状态读不到' }
     if ($s -and $s.current) {
-      $lblBigState.Text = ('大块头 :8080 在跑，当前档 ' + $s.current + '（pid ' + $s.pid + '）')
+      $lblBigState.Text = ('大块头 :' + $global:BIGPORT + ' 在跑，当前档 ' + $s.current + '（pid ' + $s.pid + '）')
     } else {
-      $lblBigState.Text = '大块头 :8080 未在跑'
+      $lblBigState.Text = ('大块头 :' + $global:BIGPORT + ' 未在跑')
     }
 
     $bigRunning = ($s -and $s.current)
@@ -589,6 +768,13 @@ if (-not $PWSH -or -not (Test-Path $PWSH)) {
         $bs = $rowStart[$k]; $bp = $rowStop[$k]; $sl = $rowStat[$k]
         if (-not $bs) { continue }
         $running = $map.ContainsKey($m.Key)
+
+        # [2026-10-23 v30] 本机没这个模型文件 → 灰掉并说明（在跑的除外，别把正在跑的标错）
+        if (-not $running -and $global:PRESENT[[string]$m.Key] -eq $false) {
+          $bs.Enabled = $false; $bp.Enabled = $false
+          $sl.Text = '本机无此模型'; $sl.ForeColor = $OFF
+          continue
+        }
 
         if ($m.Dual) {
           if ($g.Id -ne $ANCHOR_CARD_ID) {
@@ -762,10 +948,8 @@ if (-not $PWSH -or -not (Test-Path $PWSH)) {
 
   $gbSw = GB $colX[1] 12 $GBW 340 '一键换所有对话窗口的模型'
   $gbSw.Controls.Add((LBL 12 22 300 20 '目标模型（下拉选，也可自己填）'))
-  # [2026-10-19 v17] 抄参考项目：改成下拉菜单，一次列出所有可换模型（本地大块头 + 27B 全家 + 视觉 + 云端），
-  #   数据源 console-models.json（执行器 model-list 动作生成）。
-  #   [2026-10-20 v17 坑] ComboBoxStyle 只有 DropDown / DropDownList / Simple 三个值，没有 ::ComboBox；
-  #   写 ::ComboBox 会得到 null → 赋值抛「Cannot convert null」→ 整个窗口打不开。用 DropDown（可打字可下拉）。
+  # 下拉列出所有可换模型，数据源 console-models.json（执行器 model-list 生成）
+  #   坑：ComboBoxStyle 没有 ::ComboBox，写错得到 null 会让整个窗口打不开；用 DropDown（可打字可下拉）
   $cmbModel = New-Object System.Windows.Forms.ComboBox
   $cmbModel.Location = [System.Drawing.Point]::new(12, 46)
   $cmbModel.Width = 440
@@ -1238,11 +1422,7 @@ if (-not $PWSH -or -not (Test-Path $PWSH)) {
   $t5.Controls.Add($gbVer)
 
   # ---------- 页⑥ 本机入口（v20 新增） ----------
-  # [2026-10-20 v20] 用户：「桌面那个文件夹里的链接，你看看还要加哪个，你研究一下」
-  #   研究结论（实测过桌面 C:\<用户名>\Desktop\模型服务控制台）：
-  #     三个 .url → 大块头监控=http://127.0.0.1:8080/、OpenClaw 控制台=http://127.0.0.1:18789/、知识库=http://127.0.0.1:8989/
-  #     其余是本地文件快捷方式（部署清单 txt、docs 快捷方式、杜比插件、梦境日记、本机助手记忆、启动画图、重启本机助手服务 bat）
-  #   网关救援已在页②、版本与官方 GitHub 已在页⑤，所以本页只补「本机服务入口（带实时在跑状态）+ 常用文件位置」
+  # 本机服务入口（带实时在跑状态）+ 常用文件位置；网关救援在页②、版本与官方链接在页⑤
   $t6 = New-Object System.Windows.Forms.TabPage
   $t6.Text = '本机入口'
   $tabs.TabPages.Add($t6)
@@ -1250,7 +1430,7 @@ if (-not $PWSH -or -not (Test-Path $PWSH)) {
   $gbLocal = GB $colX[0] 12 $GBW 340 '本机服务入口（点文字直接开）'
   # [2026-10-22 v26] 入口清单改从配置 ENTRIES 读（[名称, 端口, 网址]）；配置没给就用本机这三条
   $localSrv = if ($CFGENT) { $CFGENT } else { @(
-    @('Strata 监控台（大块头路由器 :8080）', 8080,  'http://127.0.0.1:8080/'),
+    @(('Strata 监控台（大块头 :' + $global:BIGPORT + '）'), $global:BIGPORT,  ('http://127.0.0.1:' + $global:BIGPORT + '/')),
     @('OpenClaw 控制台（网关 :18789）',      18789, 'http://127.0.0.1:18789/'),
     @('知识库（:8989）',                  8989,  'http://127.0.0.1:8989/')
   ) }
@@ -1273,7 +1453,7 @@ if (-not $PWSH -or -not (Test-Path $PWSH)) {
   }
   $gbLocalNotes = if ($CFGNOTES) { $CFGNOTES } else { @(
     '对应桌面「模型服务控制台」里那三个快捷方式：',
-    '大块头监控=8080、OpenClaw 控制台=18789、知识库=8989',
+    ('大块头监控=' + $global:BIGPORT + '、OpenClaw 控制台=18789、知识库=8989'),
     '知识库没在跑时点了会连不上（先起知识库服务）',
     '右上角最左边那个「Strata 监控」是同一个地址'
   ) }
@@ -1583,6 +1763,7 @@ if (-not $PWSH -or -not (Test-Path $PWSH)) {
   $timer.Interval = 700
   # [2026-10-20 v18] 窗口真正显示后才做同步读取 + 启动后台采集（先弹窗、后填数据）
   $frm.Add_Shown({
+    try { if (-not (Up $global:BIGPORT)) { BigPortProbe } } catch { }
     # [2026-10-21 v25] 状态改成后台异步读后，刚开窗口那一下可能还没读到 → 先最多等 1.5 秒再刷，避免误显示「未在跑」
     for ($pz = 0; $pz -lt 10; $pz++) { if (StrataStatus) { break }; Start-Sleep -Milliseconds 150 }
     try { RefreshState } catch { }

@@ -56,12 +56,8 @@ $WS       = Join-Path $PACKDIR 'logs'
 $GWRESCUE = 'D:\06.AItools\openclaw\workspace\tools\gateway-rescue.ps1'
 $CACHECLR = 'D:\06.AItools\strata-cache-clear.ps1'
 $LLMSVC   = 'D:\06.AItools\llm-service.ps1'
-# [2026-10-23 v29] PowerShell 7 的位置改成运行时自己解析（修「朋友机器点什么都报：系统找不到指定的文件」）
-#   朋友机器的 pwsh 是**微软商店版**（C:\Users\<用户>\AppData\Local\Microsoft\WindowsApps\...\pwsh.exe），
-#   而原来写死的默认值是 **MSI 版路径** C:\Program Files\PowerShell\7\pwsh.exe → 不存在 →
-#   Start-Process 直接报「系统找不到指定的文件」；连「自检并修正路径」自己都起不来（它也要用 pwsh 起）= 死锁。
-#   本脚本本身就是被 pwsh 跑的 → $PSHOME 就是真 pwsh 所在目录，最可靠；再退回 MSI 默认路径；再退回 PATH 里的 pwsh。
-#   配置文件 console-paths.json 里的 PWSH 仍可覆盖（覆盖逻辑在下面，顺序不变）。
+# [2026-10-23 v29] pwsh 位置运行时解析（商店版在 WindowsApps 下，写死 MSI 路径在别人机器上不存在）。
+#   顺序 $PSHOME → MSI 默认 → PATH；console-paths.json 的 PWSH 可覆盖。
 $mcPsHome = if ($PSHOME -and (Test-Path (Join-Path $PSHOME 'pwsh.exe'))) { Join-Path $PSHOME 'pwsh.exe' } else { '' }
 $mcPsMsi   = 'C:\Program Files\PowerShell\7\pwsh.exe'
 $mcPsPath   = if ((Get-Command pwsh -CommandType Application -ErrorAction SilentlyContinue)) { (Get-Command pwsh -CommandType Application -ErrorAction SilentlyContinue)[0].Source } else { '' }
@@ -86,9 +82,8 @@ if (Test-Path $PATHF) {
 }
 
 # ---------- 模型登记表（顺序 = 桌面 bat 菜单顺序） ----------
-# [2026-10-22 v27] 与界面共用同一份外置「档位清单」console-tiers.json：有且读得进去就用它，否则用内置表。
-#   注意别和 console-models.json 搞混：那个是页③「可换模型」下拉的缓存（本文件 model-list 动作生成）。
-#   nameRun / needRun 不给就用 name / need（界面上的名字与执行器里显示的可以不同）。
+# [2026-10-22 v27] 与界面共用外置清单 console-tiers.json，读不到用内置表；nameRun/needRun 不给就用 name/need。
+#   别和 console-models.json 搞混：那是页③「可换模型」下拉的缓存（本文件 model-list 生成）。
 $REG_DEF = @{
   'iq2x'  = @{ name='大块头 IQ2X（无删减 IQ2_XS）·默认'; need=42100; dual=$true;  engine='strata'; tier='iq2x' ; act='big'  }
   'q2x'   = @{ name='大块头 Q2X（无删减 Q2_0）';        need=40450; dual=$true;  engine='strata'; tier='q2x'  ; act='big'  }
@@ -137,6 +132,37 @@ if (Test-Path $MODELSF) {
   } catch { Write-Host ('  档位清单 console-tiers.json 读不了（多半是 JSON 写法不对：Windows 路径的反斜杠要写两个）：' + $_.Exception.Message + ' —— 本次改用内置表') }
 }
 
+# ---------- [2026-10-23 v30] 本机扫描清单：与界面读同一份 console-tiers.scanned.json，否则列了却起不来 ----------
+$scanf = Join-Path $PACKDIR 'console-tiers.scanned.json'
+if (Test-Path $scanf) {
+  try {
+    $sj = Get-Content $scanf -Raw -Encoding UTF8 | ConvertFrom-Json
+    $addN = 0
+    foreach ($e in @($sj.entries)) {
+      $k = [string]$e.key
+      if (-not $k) { continue }
+      if ($REG[$k]) { continue }                                          # 内置/手写条目优先，不覆盖
+      if ('big','27b','vl' -notcontains [string]$e.act) { continue }
+      if ([int]$e.need -le 0) { continue }
+      $one = @{
+        name   = $(if ($e.nameRun) { [string]$e.nameRun } else { [string]$e.name })
+        need   = $(if ($e.needRun) { [int]$e.needRun } else { [int]$e.need })
+        dual   = [bool]$e.dual
+        engine = $(if ($e.engine) { [string]$e.engine } elseif ([string]$e.act -eq 'big') { 'strata' } else { 'llama' })
+        act    = [string]$e.act
+      }
+      if ($e.tier)   { $one.tier   = [string]$e.tier }
+      if ($e.id)     { $one.id     = [string]$e.id }
+      if ($e.gguf)   { $one.gguf   = [string]$e.gguf }
+      if ($e.mmproj) { $one.mmproj = [string]$e.mmproj }
+      if ($e.ctx)    { $one.ctx    = [int]$e.ctx }
+      if ($e.port)   { $one.port   = [int]$e.port }
+      $REG[$k] = $one; $ORDER += $k; $addN++
+    }
+    if ($addN -gt 0) { Write-Host ('  本机扫描清单补入 ' + $addN + ' 个模型（共 ' + $ORDER.Count + ' 条）') }
+  } catch { Write-Host ('  本机扫描清单读不了（删掉 console-tiers.scanned.json 会自动重扫）：' + $_.Exception.Message) }
+}
+
 # ---------- 原子工具 ----------
 # [2026-10-22 v27] 视觉模型不再写死 vl8/8096：从登记表里找 act=vl 的那条；没给 port 就用 8096
 function VlKey { foreach ($k in $ORDER) { if ($REG[$k].act -eq 'vl') { return $k } } return '' }
@@ -150,6 +176,20 @@ function PortPid([int]$port) {
   if ($c.Count -eq 0) { return $null }
   return $c[0].OwningProcess
 }
+# [2026-10-23 v30] 大块头端口不写死 8080（官方 Strata 默认 8095）；配置 BIGPORT 优先，否则探 /health
+if (-not $BIGPORT) { $BIGPORT = 8080 }
+$global:BIGPORT = [int]$BIGPORT
+function BigPortProbe {
+  $cands = @($global:BIGPORT, 8080, 8095, 8081, 8082, 8100) | Select-Object -Unique
+  foreach ($p in $cands) {
+    if (-not (Up $p)) { continue }
+    try {
+      $hv = Invoke-WebRequest ('http://127.0.0.1:' + $p + '/health') -TimeoutSec 3 -UseBasicParsing | ConvertFrom-Json
+      if ($hv -and $hv.service -eq 'strata') { $global:BIGPORT = [int]$p; return }
+    } catch { }
+  }
+}
+BigPortProbe
 function FreeMiB([int]$idx) {
   $rows = @(& nvidia-smi --query-gpu=index,memory.free --format=csv,noheader,nounits 2>$null)
   foreach ($r in $rows) {
@@ -200,8 +240,36 @@ function Scan-Strata {
        $_.ProcessId -ne $PID)
     })
 }
+function TierFromModel([string]$m) {
+  # [2026-10-23 v30] 与界面同一套：把引擎报的模型名对回清单里的档位名；对不上就原样返回
+  if (-not $m) { return '' }
+  $mm = ([string]$m).ToLower()
+  $tiers = @()
+  foreach ($k in $ORDER) {
+    if ($REG[$k].act -ne 'big') { continue }
+    $t = $(if ($REG[$k].tier) { [string]$REG[$k].tier } else { [string]$k })
+    $t = $t.ToLower()
+    if ($t -and ($tiers -notcontains $t)) { $tiers += $t }
+  }
+  foreach ($t in $tiers) { if ($mm -eq $t -or $mm.EndsWith('-' + $t)) { return $t } }
+  foreach ($t in ($tiers | Sort-Object { $_.Length } -Descending)) { if ($mm.Contains($t)) { return $t } }
+  return $m
+}
 function StrataStatus {
-  try { return (Invoke-WebRequest 'http://127.0.0.1:8080/__status' -TimeoutSec 6 -UseBasicParsing | ConvertFrom-Json) } catch { return $null }
+  # [2026-10-23 v30] /__status 是自建路由私有接口，官方 Strata 没有 → 别人机器上恒为 null；问不到改问官方 /health。
+  try { return (Invoke-WebRequest ('http://127.0.0.1:' + $global:BIGPORT + '/__status') -TimeoutSec 6 -UseBasicParsing | ConvertFrom-Json) } catch { }
+  try {
+    $hv = Invoke-WebRequest ('http://127.0.0.1:' + $global:BIGPORT + '/health') -TimeoutSec 6 -UseBasicParsing | ConvertFrom-Json
+    if ($hv -and $hv.model) {
+      $ld = $true
+      if ($hv.PSObject.Properties['loaded']) { $ld = [bool]$hv.loaded }
+      if (-not $ld) { return $null }
+      $pp = $null
+      try { $pp = PortPid $global:BIGPORT } catch { }
+      return [pscustomobject]@{ current = (TierFromModel ([string]$hv.model)); model = [string]$hv.model; pid = $pp; official = $true }
+    }
+  } catch { return $null }
+  return $null
 }
 function ToolFile([string]$name) {
   # [2026-10-20 v22] 在工具目录找脚本；找不到就在常见位置兜底（换机器不至于直接瘫）
@@ -217,8 +285,8 @@ function Stop-StrataOnly {
     return $true
   }
   # 先请引擎优雅卸载（让正在生成的回答跑完），再杀
-  if (Up 8080) {
-    try { Invoke-WebRequest 'http://127.0.0.1:8080/unload?wait=120' -Method POST -ContentType 'application/json' -Body '{}' -TimeoutSec 150 -UseBasicParsing | Out-Null; Write-Host '  [腾卡] 已优雅卸载' } catch { Write-Host '  [腾卡] 优雅卸载不成，直接硬杀' }
+  if (Up $global:BIGPORT) {
+    try { Invoke-WebRequest ('http://127.0.0.1:' + $global:BIGPORT + '/unload?wait=120') -Method POST -ContentType 'application/json' -Body '{}' -TimeoutSec 150 -UseBasicParsing | Out-Null; Write-Host '  [腾卡] 已优雅卸载' } catch { Write-Host '  [腾卡] 优雅卸载不成，直接硬杀' }
   }
   # 顺序很关键：先杀守护/拉起 → 再杀 router → 再杀后端 → 最后杀引擎
   for ($round = 1; $round -le 5; $round++) {
@@ -242,32 +310,84 @@ function Stop-StrataOnly {
     Start-Sleep -Seconds 8
     if (@(Scan-Strata).Count -gt 0) { Write-Host '  ✗ 大块头仍杀不干净，看 strata-router*.log' -ForegroundColor Red; return $false }
   }
-  if (Up 8080) { Write-Host '  ✗ 8080 仍监听（router 未死）' -ForegroundColor Red; return $false }
-  Write-Host '  [大块头] 已停，两卡显存释放' -ForegroundColor Green
+  if (Up $global:BIGPORT) { Write-Host ('  ✗ :' + $global:BIGPORT + ' 仍监听（router 未死）') -ForegroundColor Red; return $false }
+  Write-Host '  [大块头] 已停，显存释放' -ForegroundColor Green
   return $true
 }
 function Ensure-StrataRouter {
-  if (Up 8080) { return $true }
+  if (Up $global:BIGPORT) { return $true }
   Write-Host '  拉起大块头 router + keeper ...'
   if ($DryRun) { Write-Host '  [DryRun] 会跑 strata-start-all-hidden.vbs'; return $true }
   # [2026-10-20 v22] 原来写 Join-Path $BASE（= 控制台包目录），但启动 vbs 在工具目录 → 永远找不到，
   #   于是报「8080 没起来」+「switch 异常：由于目标计算机积极拒绝」，用户只能去用 bat 启动。
   $vbs = ToolFile 'strata-start-all-hidden.vbs'
-  if (-not $vbs) { Write-Host '   ✗ 找不到 strata-start-all-hidden.vbs（工具目录不对：改 console-paths.json 的 TOOLDIR）' -ForegroundColor Red; return $false }
+  if (-not $vbs) {
+    # [2026-10-23 v30] 没有自建路由 = 官方 Strata 机器。这里先不起：档位由后面的 Switch-Tier 定，
+    #   在这里起等于不知道要哪个档（会随机挑一个配置文件）。
+    Write-Host '  没找到自建路由的启动脚本 → 这台是官方 Strata，起哪个档交给换档那步办'
+    return $true
+  }
   try { wscript $vbs } catch { Write-Host ('   启动失败: ' + $_.Exception.Message) -ForegroundColor Red; return $false }
-  for ($i = 0; $i -lt 150 -and -not (Up 8080); $i++) { Start-Sleep -Milliseconds 500 }
-  if (-not (Up 8080)) { Write-Host '   ✗ 8080 没起来（看 D:\06.AItools\strata-router*.log）' -ForegroundColor Red; return $false }
-  Write-Host '   8080 已就绪'
+  for ($i = 0; $i -lt 150 -and -not (Up $global:BIGPORT); $i++) { Start-Sleep -Milliseconds 500 }
+  if (-not (Up $global:BIGPORT)) { Write-Host ('   ✗ :' + $global:BIGPORT + ' 没起来（看 ' + $TOOLDIR + '\strata-router*.log）') -ForegroundColor Red; return $false }
+  Write-Host ('   :' + $global:BIGPORT + ' 已就绪')
+  return $true
+}
+# [2026-10-23 v30] 没有自建路由的机器（官方 Strata）：按官方方式起 —— 读官方目录里的 run-<档>.bat，
+#   或 python serve\server.py --engine strata --config <档位json> --port <端口>。
+function OfficialStart([string]$tier) {
+  $bat = ''
+  try { $bat = @(Get-ChildItem -LiteralPath $TIER_DIR -Filter ('run-' + $tier + '.bat') -File -ErrorAction SilentlyContinue)[0].FullName } catch { }
+  if ($bat) {
+    Write-Host ('  官方方式：跑 ' + (Split-Path $bat -Leaf))
+    if ($DryRun) { Write-Host '  [DryRun] 会隐藏运行这个 bat'; return $true }
+    try { Start-Process -FilePath $bat -WorkingDirectory $TIER_DIR -WindowStyle Hidden } catch { Write-Host ('   启动失败: ' + $_.Exception.Message) -ForegroundColor Red; return $false }
+  } else {
+    $py = @( (Join-Path $TIER_DIR '.venv\Scripts\python.exe'), 'python' ) | Where-Object { if ($_.Contains('')) { Test-Path $_ } else { Get-Command $_ -CommandType Application -ErrorAction SilentlyContinue } } | Select-Object -First 1
+    $srv = Join-Path $TIER_DIR 'serve\server.py'
+    $cfgs = @()
+    try { $cfgs = @(Get-ChildItem -LiteralPath $TIER_DIR -Filter '*.json' -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -like ('*' + $tier + '*') }) } catch { }
+    if (-not $py -or -not (Test-Path $srv) -or $cfgs.Count -eq 0) {
+      Write-Host ('   ✗ 这台机器没有本助手的自建路由，也没找到官方起法需要的东西（要 ' + $TIER_DIR + '\serve\server.py + 档位 ' + $tier + ' 的 json + python）')
+      Write-Host '     改 console-paths.json 的 TIER_DIR 指向 Strata 目录，或先用 Strata 自己的方式把模型起起来'
+      return $false
+    }
+    $cfg = $cfgs[0].FullName
+    Write-Host ('  官方方式：server.py --config ' + (Split-Path $cfg -Leaf) + ' --port ' + $global:BIGPORT)
+    if ($DryRun) { Write-Host ('  [DryRun] 会起 ' + $py + ' ' + $srv + ' --engine strata --config ' + $cfg + ' --port ' + $global:BIGPORT); return $true }
+    $lg = Join-Path $PACKDIR ('logs\official-' + $tier + '-' + (Get-Date).ToString('yyyyMMdd-HHmmss') + '.log')
+    try { if (-not (Test-Path (Split-Path $lg -Parent))) { New-Item -ItemType Directory -Force -Path (Split-Path $lg -Parent) | Out-Null } } catch { }
+    try {
+      $sa = @($srv, '--engine', 'strata', '--config', $cfg, '--port', [string]$global:BIGPORT)
+      Start-Process -FilePath $py -ArgumentList $sa -WorkingDirectory $TIER_DIR -WindowStyle Hidden -RedirectStandardOutput $lg -RedirectStandardError ($lg + '.err')
+    } catch { Write-Host ('   启动失败: ' + $_.Exception.Message) -ForegroundColor Red; return $false }
+  }
+  for ($i = 0; $i -lt 240 -and -not (Up $global:BIGPORT); $i++) { Start-Sleep -Milliseconds 500 }
+  if (-not (Up $global:BIGPORT)) { Write-Host ('   ✗ :' + $global:BIGPORT + ' 没起来（看 ' + $TIER_DIR + ' 里的日志）') -ForegroundColor Red; return $false }
+  Write-Host ('   :' + $global:BIGPORT + ' 已就绪')
   return $true
 }
 function Switch-Tier([string]$tier) {
   Write-Host ('  切到 ' + $tier + ' 并上卡（约 40–90 秒，请稍候）...')
   if ($DryRun) { Write-Host '  [DryRun] 会 GET /__switch?tier=' + $tier; return $true }
-  try { Invoke-WebRequest ('http://127.0.0.1:8080/__switch?tier=' + $tier) -TimeoutSec 600 -UseBasicParsing | Out-Null } catch { Write-Host ('   switch 异常: ' + $_.Exception.Message) -ForegroundColor Yellow }
+  # [2026-10-23 v30] 官方 Strata 没有 /__switch：换档 = 按那个档位的配置重新起（先卸再起）
+  #   端口压根没在听时也别去 GET /__switch（会 404 再白 ping 300 秒），直接按官方方式起
+  if (-not (Up $global:BIGPORT)) { return (OfficialStart $tier) }
+  $s0 = $null
+  try { $s0 = StrataStatus } catch { }
+  if ($s0 -and $s0.official) {
+    if ([string]$s0.current -eq [string]$tier) { Write-Host ('   ✓ 已在跑 ' + $tier + '，不用切'); return $true }
+    try { Invoke-WebRequest ('http://127.0.0.1:' + $global:BIGPORT + '/unload?wait=120') -Method POST -ContentType 'application/json' -Body '{}' -TimeoutSec 150 -UseBasicParsing | Out-Null } catch { }
+    $pp = $null
+    try { $pp = PortPid $global:BIGPORT } catch { }
+    if ($pp) { & taskkill /PID $pp /T /F 2>&1 | Out-Null; Start-Sleep -Seconds 4 }
+    return (OfficialStart $tier)
+  }
+  try { Invoke-WebRequest ('http://127.0.0.1:' + $global:BIGPORT + '/__switch?tier=' + $tier) -TimeoutSec 600 -UseBasicParsing | Out-Null } catch { Write-Host ('   switch 异常: ' + $_.Exception.Message) -ForegroundColor Yellow }
   for ($i = 0; $i -lt 300; $i++) {
     try {
       $b = '{"model":"' + $tier + '","messages":[{"role":"user","content":"ping"}],"max_tokens":1}'
-      $r = Invoke-WebRequest 'http://127.0.0.1:8080/v1/chat/completions' -Method POST -ContentType 'application/json' -Body $b -TimeoutSec 25 -UseBasicParsing
+      $r = Invoke-WebRequest ('http://127.0.0.1:' + $global:BIGPORT + '/v1/chat/completions') -Method POST -ContentType 'application/json' -Body $b -TimeoutSec 25 -UseBasicParsing
       if ($r.StatusCode -eq 200) { Write-Host ('   ✓ ' + $tier + ' 已上卡，可回话'); return $true }
     } catch {}
     Start-Sleep -Seconds 1
@@ -390,7 +510,7 @@ function Restore-ReserveLatest {
 function Show-State {
   Write-Host '=== 实时状态 ==='
   $s = StrataStatus
-  if ($s) { Write-Host ('  大块头 :8080  当前档 ' + $s.current + '  pid ' + $s.pid) } else { Write-Host '  大块头 :8080  停' }
+  if ($s) { Write-Host ('  大块头 :' + $global:BIGPORT + '  当前档 ' + $s.current + '  pid ' + $s.pid) } else { Write-Host ('  大块头 :' + $global:BIGPORT + '  停') }
   foreach ($port in (LlamaPorts)) {   # [2026-10-22 v27] 视觉端口跟着清单走
     $ps = [string]$port
     if (Up $port) { Write-Host ('  :' + $ps + ' 在跑  pid ' + (PortPid $port)) } else { Write-Host ('  :' + $ps + ' 停') }
@@ -424,7 +544,7 @@ switch ($Action) {
     $serve  = @($all | Where-Object { $_.Name -eq 'python.exe' -and $_.CommandLine -match $SERVE_PAT })
     $engine = @($all | Where-Object { $_.Name -eq 'strata.exe' })
     Write-Host ('  停的顺序会是：守护 ' + $guard.Count + ' → router ' + $router.Count + ' → 后端 ' + $serve.Count + ' → 引擎 ' + $engine.Count)
-    Write-Host ('  8080 监听 = ' + (Up 8080) + '；8093 监听 = ' + (Up 8093))
+    Write-Host ('  :' + $global:BIGPORT + ' 监听 = ' + (Up $global:BIGPORT) + '；8093 监听 = ' + (Up 8093))
   }
 
   'start-big' {

@@ -96,6 +96,24 @@ async function main() {
 
   // 服务在跑状态
   const p8080 = await portOpen(8080);
+// [2026-10-23 v30] 大块头端口不写死：8080 是自建路由，官方 Strata 默认 8095。找「回 /health 且 service=strata」的那个口。
+async function healthAt(port) {
+  try {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 900);
+    const r = await fetch('http://127.0.0.1:' + port + '/health', { signal: ctl.signal });
+    clearTimeout(t);
+    if (!r.ok) return null;
+    const j = await r.json();
+    return (j && j.service === 'strata') ? j : null;
+  } catch { return null; }
+}
+let bigPort = 0, bigModel = '';
+for (const p of [8080, 8095, 8081, 8082, 8100]) {
+  if (!(await portOpen(p))) continue;
+  const h = await healthAt(p);
+  if (h) { bigPort = p; bigModel = String(h.model || ''); break; }
+}
   const p18789 = await portOpen(18789);
   const p8090 = await portOpen(8090);
   const p8096 = await portOpen(8096);
@@ -117,7 +135,7 @@ async function main() {
     { k: 'openclaw', name: 'OpenClaw 命令行（定时任务/换窗口模型要用）', ok: !!ocCli, path: ocCli, note: (ocCli ? ('版本 ' + (ocVer || '?')) : '没装：npm install -g openclaw') },
     { k: 'gateway', name: 'OpenClaw 网关（:18789）', ok: p18789, path: p18789 ? 'http://127.0.0.1:18789/' : '', note: p18789 ? '在跑' : '未在跑（页②有救援按钮）' },
     { k: 'strata', name: 'Strata 引擎目录（档位配置在这儿）', ok: !!tierDir, path: tierDir, note: tierDir ? ('引擎版本 ' + (enVer || '?')) : '找不到 Strata 目录' },
-    { k: 'router', name: '大块头路由器（:8080）', ok: p8080, path: p8080 ? 'http://127.0.0.1:8080/' : '', note: p8080 ? '在跑' : '未在跑（页①点「起」会自动拉起）' },
+    { k: 'router', name: '大块头服务（自动找端口）', ok: bigPort > 0, path: bigPort ? ('http://127.0.0.1:' + bigPort + '/') : '', note: bigPort ? ('在跑 :' + bigPort + (bigModel ? '，模型 ' + bigModel : '')) : '没找到（试了 8080/8095/8081/8082/8100；页①点「起」会自动拉起）' },
     { k: 'tools', name: '启动脚本目录（strata-router.py / 启动 vbs）', ok: !!toolDir, path: toolDir, note: toolDir ? '' : '找不到启动脚本，起大块头会失败' },
     { k: 'llama', name: 'llama-server.exe（27B / 视觉要用）', ok: !!llamaExe, path: llamaExe, note: llamaExe ? '' : '找不到 llama-server.exe，27B 与视觉起不来' },
     { k: 'models', name: '模型盘（gguf 文件）', ok: !!modelsDir, path: modelsDir, note: modelsDir ? '' : '找不到模型目录' },

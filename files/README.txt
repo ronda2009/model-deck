@@ -55,6 +55,11 @@ HOW TO MOVE TO ANOTHER PC
        CACHECLR    = strata-cache-clear.ps1 (optional; blank = skip)
        LLMSVC      = llm-service.ps1 (optional; blank = skip)
        OPENCLAW_CLI= openclaw.mjs (needed for the window-model page)
+       BIGPORT     = the port your big-model service answers on. Leave it out and
+                     the program finds it itself: it asks every port that is
+                     listening "who are you" (/health) and takes the one that
+                     answers "strata". 8080 is only this author's own router;
+                     official Strata defaults to 8095, so do not assume 8080.
      Blank value = that feature is skipped, nothing crashes.
      Keep the exe next to the folder: it prefers the script in its own folder.
 
@@ -368,7 +373,59 @@ MACHINES WHERE POWERSHELL 7 CAME FROM THE MICROSOFT STORE
   PATH and launched a child process with exit code 0, and the all-empty case
   triggers the plain-language message). This machine is unaffected: its pwsh IS
   the MSI path, so the resolved value is identical to the old hardcoded one.
+v30 - THE PROGRAM NOW LOOKS AT THE MACHINE IT IS ON
+---------------------------------------------------------
 
+  Three things used to be "whatever is on the author's machine", which read fine
+  in the README but broke the first time anyone else clicked:
+
+  1) "Which model is running" only asked http://127.0.0.1:8080/__status. That
+     endpoint is the author's own Python router, NOT part of Strata - official
+     Strata answers 404. On a machine running plain Strata the page therefore
+     said "no model running" while the model was plainly running and answering.
+     It now asks /__status first and falls back to Strata's own /health (no key
+     needed, returns the model name and whether it is loaded), so it reports the
+     model either way. If the name does not match a tier in your list, the raw
+     model name is shown rather than "none".
+
+  2) The port was hard-coded to 8080. Official Strata defaults to 8095. The port
+     is now discovered: whatever port answers /health with "service: strata" is
+     the big-model port. You can still pin it with BIGPORT in console-paths.json.
+     The probe runs at startup and when you press Refresh - never inside the
+     5-second timer, because a synchronous web call there is what froze the
+     window in v25.
+
+  3) The start/stop list was the author's own models. A machine with more models
+     did not show them; a machine with none of them showed eleven rows that could
+     not start. Now:
+       - the model folder is scanned once (console-paths.json -> MODELS) and any
+         .gguf that is not already in the list is added, with a rough memory
+         estimate from the file size. The result is cached in
+         console-tiers.scanned.json; delete that file to rescan. A hand-written
+         console-tiers.json still wins over everything.
+       - rows whose model file is not on this machine are greyed out and labelled
+         "not on this machine" instead of offering "start". If the folder itself
+         does not exist the row is left alone rather than wrongly greyed.
+       - each card scrolls when there are more models than fit, so a big library
+         does not need a bigger window. With eleven or fewer rows nothing moves:
+         the layout is pixel-identical to before.
+
+  Also on machines without the author's router: "start" now falls back to the
+  official way of launching Strata (run-<tier>.bat in the Strata folder, or
+  python serve\server.py --engine strata --config <tier json> --port <port>),
+  and switching tiers there means unloading and starting the other config,
+  because official Strata has no /__switch. Stopping uses Strata's own /unload.
+
+  What still needs the author's setup (it is honestly labelled in the UI): the
+  OpenClaw pages - window models, scheduled jobs, heartbeat model, gateway
+  rescue - need OpenClaw installed and its CLI path in console-paths.json.
+
+  Verified on this machine: page 1 shows the running model and the green row
+  (108 ms to read via the fallback path against the official engine on 8095);
+  port probe picks 8095 when 8080 is not listening and returns "nothing" in 3 ms
+  when no port is listening; presence check marks a missing .gguf as absent and
+  leaves rows alone when the folder is missing; the scroll probe drags to the
+  last row with 13 models and shows no scrollbar at 11 or fewer.
 
 LICENSE
 --------------------------------------------------

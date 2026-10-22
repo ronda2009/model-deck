@@ -71,6 +71,17 @@ PowerShell 7 有两种装法：**MSI** 装在 `C:\Program Files\PowerShell\7\pws
 
 现在改成**运行时自己找**：先看正在跑本脚本的那个 pwsh 在哪（最可靠），再试 MSI 路径，再试 PATH 里的 `pwsh`；`console-paths.json` 里的 `PWSH` 仍可覆盖。三条都找不到时会用人话告诉你：装 PowerShell 7（`winget install Microsoft.PowerShell`）或在配置里写 `PWSH`。
 
+### v30 新增：程序先看你这台机器（扫模型清单 / 自己找端口 / 官方 Strata 也能起停）
+
+以前有三处其实是「我机器上长这样」，别人一点就露馅，v30 都改成看现场：
+
+- **「当前在跑哪个模型」不再只问我自己的路由**：原来只问 `http://127.0.0.1:8080/__status`，那是助手自己写的 Python 路由，**不是 Strata 的一部分**（官方 Strata 回 404）。所以朋友机器上模型明明在跑、明明在应答，页① 却说「没检测到运行中的模型」。现在先问 `/__status`，问不到就改问 Strata 自带的 `/health`（不用密钥，直接给模型名和是否已加载），两边都能报出来；名字对不上清单时**直接显示那个模型名**，不再当成「没有」。
+- **端口不再写死 8080**：官方 Strata 默认是 **8095**。现在程序自己去认：哪个端口对 `/health` 答「service: strata」，那个就是大块头端口。想钉死就在 `console-paths.json` 写 `BIGPORT`。探测只在启动和按「刷新」时跑，**不放进 5 秒定时器**（同步网络请求放定时器里就是 v25 卡窗口的原因）。
+- **起停清单不再是我那 11 个模型**：模型多的机器看不到自己的模型，模型少的机器看到 11 条根本起不来的行。现在启动时扫一遍模型目录（`console-paths.json` 的 `MODELS`），清单里没有的 `.gguf` 自动补进页①（按文件大小给个显存粗估），结果缓存进 `console-tiers.scanned.json`（删掉它就重扫）；手写的 `console-tiers.json` 永远优先。本机没有模型文件的行会**标灰并写「本机无此模型」**，不再给你「启动」按钮；目录本身不存在时**不瞎标灰**。模型比窗口高时**卡片内可滚动**，11 条以内布局和以前一模一样、不动。
+- **没有助手路由的机器也能起**：「启动」会退回官方起法（Strata 目录里的 `run-<档>.bat`，或 `python serve\server.py --engine strata --config <档位json> --port <端口>`）；那种机器上「换档」= 先 `/unload` 再起另一份配置（官方 Strata 没有 `/__switch`）。停档用 Strata 自己的 `/unload`。
+
+仍然需要助手那套的：**OpenClaw 相关页**（窗口换模型、定时任务、心跳模型、网关救援）要装了 OpenClaw 并在 `console-paths.json` 填好 CLI 路径——界面里都写清楚了，不会让你猜。
+
 ## 首次运行的两个提示 / Two first-run notes
 
 - **SmartScreen 说「未知发布者」**：这个版本**未数字签名**。右键 → 属性 → 取消勾选「解除锁定」，或直接接受警告。exe 的 SHA256 标在下载页与 `SHA256.txt`。
@@ -105,8 +116,8 @@ MIT（见 `LICENSE.txt`；`LICENSE-中文参考.txt` 是非官方中文参考，
 
 ## 下载 / Download
 
-看 **Releases**：`model-console-v29-windows.zip`（约 2.0 MB，含 exe + 两份示例配置（路径 / 模型清单）+ README + LICENSE + `SHA256.txt`）。
+看 **Releases**：`model-console-v30-windows.zip`（约 2.0 MB，含 exe + 两份示例配置（路径 / 模型清单）+ README + LICENSE + `SHA256.txt`）。
 
 ## 这个版本的状态 / Status
 
-v26 是**第一个对外发布版**；v27 把「模型清单」做成可外置（不改就跟以前一样）；v28 给 exe 加了应用程序清单（免费那条，**仍**未签名）；**v29 修了一个真 bug**：PowerShell 7 若是从**微软商店**装的（不是 MSI），以前点任何按钮都报「系统找不到指定的文件」，见下节。主要在我自己这台机器上日常使用（RTX 3090 + RTX 3080 双卡，Strata 引擎 + llama.cpp + OpenClaw）。**未签名**，**只在 Windows 上测过**。有问题欢迎开 issue。
+v26 是**第一个对外发布版**；v27 把「模型清单」做成可外置（不改就跟以前一样）；v28 给 exe 加了应用程序清单（免费那条，**仍**未签名）；**v29 修了一个真 bug**：PowerShell 7 若是从**微软商店**装的（不是 MSI），以前点任何按钮都报「系统找不到指定的文件」，见下节。主要在我自己这台机器上日常使用（RTX 3090 + RTX 3080 双卡，Strata 引擎 + llama.cpp + OpenClaw）。**v30 把三处「我机器上长这样」改成看现场**（认官方 Strata 的 `/health`、自己找端口、扫本机模型清单 + 标灰 + 卡片内滚动），见上节。**未签名**，**只在 Windows 上测过**。有问题欢迎开 issue。
