@@ -1,0 +1,142 @@
+[
+  {
+    "__说明1": "这是「档位清单」示例：复制本文件改名为 console-tiers.json 放同目录，界面与执行器就按这份清单办事；没有这个文件就用程序内置的清单（内容就是下面这些，所以复制过来不改也照样跑）。"
+  },
+  {
+    "__说明2": "字段：key=代号（起停命令用它，别重复）；name=界面上显示的名字；need=起这个档两卡合计要占的显存 MiB（界面用它判「可起/显存不够」）；dual=是否两卡合扛；act=动作类型，只能是 big（引擎换档）/ 27b（走 27B 路由 :8090）/ vl（独立 llama 实例）。"
+  },
+  {
+    "__说明3": "可选字段：engine（strata/llama，不给就按 act 推：big→strata，其它→llama）；tier（big 用的引擎档位名）；id（llama 的模型标识，预加载时发给服务）；gguf / mmproj（模型文件名与多模态文件，放在「模型文件盘」里，见 console-paths.json 的 MODELS）；ctx（上下文长度）；port（vl 用的端口，不给默认 8096）；nameRun / needRun（执行器里显示的名字与门槛，不给就用 name / need）。"
+  },
+  {
+    "__说明4": "写法注意：JSON 里 Windows 路径的反斜杠要写成两个（\\），否则整个文件读不进去；读不进去时程序会在日志里说明并改用内置清单，不会闷着。带 __ 开头的条目是说明文字，不算模型。"
+  },
+  {
+    "__说明5": "27B 路由端口 :8090 是助手（OpenClaw）注册死的，不能换；vl 的端口可以换（改了记得同步 console-paths.json 与助手那边的配置）。"
+  },
+  {
+    "key": "iq2x",
+    "name": "大块头 IQ2X（无删减 IQ2_XS）·默认",
+    "need": 40450,
+    "dual": true,
+    "act": "big",
+    "engine": "strata",
+    "tier": "iq2x",
+    "nameRun": "大块头 IQ2X（无删减 IQ2_XS）·默认",
+    "needRun": 42100
+  },
+  {
+    "key": "q2x",
+    "name": "大块头 Q2X（无删减 Q2_0）",
+    "need": 40450,
+    "dual": true,
+    "act": "big",
+    "engine": "strata",
+    "tier": "q2x",
+    "needRun": 40450
+  },
+  {
+    "key": "iq3x",
+    "name": "大块头 IQ3X（无删减 IQ3_XXS）",
+    "need": 40450,
+    "dual": true,
+    "act": "big",
+    "engine": "strata",
+    "tier": "iq3x",
+    "needRun": 42110
+  },
+  {
+    "key": "siq2x",
+    "name": "S-IQ2x（Swift 无删减 IQ2_XS）",
+    "need": 40450,
+    "dual": true,
+    "act": "big",
+    "engine": "strata",
+    "tier": "siq2x",
+    "needRun": 40500
+  },
+  {
+    "key": "siq3x",
+    "name": "S-IQ3x（Swift 无删减 IQ3_S）",
+    "need": 40450,
+    "dual": true,
+    "act": "big",
+    "engine": "strata",
+    "tier": "siq3x",
+    "needRun": 43500
+  },
+  {
+    "key": "c390",
+    "name": "Qwen3.8-27B-coder390（编程27B）",
+    "need": 19000,
+    "dual": false,
+    "act": "27b",
+    "engine": "llama",
+    "id": "coder390-27b",
+    "gguf": "coder390-27b.gguf",
+    "ctx": 32768,
+    "nameRun": "27B Coder390-27B"
+  },
+  {
+    "key": "under",
+    "name": "Qwen3.8-27B-GSQ-RCO（Underdog）",
+    "need": 8200,
+    "dual": false,
+    "act": "27b",
+    "engine": "llama",
+    "id": "underdog-27b",
+    "gguf": "underdog-27b.gguf",
+    "ctx": 32768,
+    "nameRun": "27B Underdog-27B"
+  },
+  {
+    "key": "j27bx",
+    "name": "Qwen3.8-27B-Abl（J27bX）",
+    "need": 16300,
+    "dual": false,
+    "act": "27b",
+    "engine": "llama",
+    "id": "j27bx",
+    "gguf": "j27bx.gguf",
+    "ctx": 32768,
+    "nameRun": "27B J27bX"
+  },
+  {
+    "key": "b27bx",
+    "name": "Qwen3.8-27B-BF16（B27bX）",
+    "need": 16300,
+    "dual": false,
+    "act": "27b",
+    "engine": "llama",
+    "id": "b27bx",
+    "gguf": "b27bx.gguf",
+    "ctx": 32768,
+    "nameRun": "27B B27bX"
+  },
+  {
+    "key": "b27ks",
+    "name": "Qwen3.8-27B-BF16-ks（B27bX-ks）",
+    "need": 15400,
+    "dual": false,
+    "act": "27b",
+    "engine": "llama",
+    "id": "b27bx-ks",
+    "gguf": "b27bx-ks.gguf",
+    "ctx": 32768,
+    "nameRun": "27B B27bX-ks"
+  },
+  {
+    "key": "vl8",
+    "name": "Qwen3-VL-8B-Q8_0（视觉·调图）",
+    "need": 9200,
+    "dual": false,
+    "act": "vl",
+    "engine": "llama",
+    "id": "qwen3-vl-8b",
+    "gguf": "Qwen3-VL-8B-Instruct-Unredacted-MAX.Q8_0.gguf",
+    "mmproj": "Qwen3-VL-8B-Instruct-Unredacted-MAX.mmproj-q8_0.gguf",
+    "ctx": 8192,
+    "port": 8096,
+    "nameRun": "Qwen3-VL-8B-Instruct-Q8_0（视觉·调图）"
+  }
+]

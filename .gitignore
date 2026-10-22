@@ -1,0 +1,17 @@
+# 构建产物（发布走 Releases 附件，不进仓库）
+model-console.exe
+*.syso
+
+# 本机档位覆盖（可选，个人配置，不进仓库）
+files/console-tiers.json
+
+# files/console-paths.json 必须进仓库：go:embed 需要它在，clone 下来缺了就构建不出完整包。
+# 仓库里那份是「全空的通用示例」（各项留空 = 用脚本内置默认值）；发布 zip 里它以
+# console-paths.example.json 的名字出现（打包脚本改名拷出去），所以仓库里只留一份 ——
+# 放两份会被 go:embed 一起封进 exe，多出来的那份永不释放、纯占体积。
+# 你自己机器上把它填了真实路径后，提交前记得别把个人路径推上去。
+
+# 杂项
+*.log
+.DS_Store
+Thumbs.db
