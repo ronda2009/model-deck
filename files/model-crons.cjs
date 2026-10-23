@@ -1,4 +1,4 @@
-// model-crons.cjs — 定时任务（automation/cron）定义清单与换模型工具（v16，2026-10-19）
+// model-crons.cjs — 定时任务（automation/cron）定义清单与换模型工具
 // 用法：
 //   node model-crons.cjs list [--out <文件>] [--hbfile <文件>]   只读：定时任务定义（中文名 + 何时跑 + 用哪个模型）+ 心跳/压缩模型
 //   node model-crons.cjs set --model <provider/model> [--dry]    把「要模型」的定时任务换成该模型（读回确认）
@@ -20,7 +20,7 @@ function cliPath() {
 const CLI = cliPath();
 const CWD = CLI ? path.dirname(CLI) : process.cwd();
 
-// shell:false 是关键：借 shell 会让 Node 把 DEP0190 警告塞进 stdout，JSON 就废了（v15 的坑）
+// shell:false 是关键：借 shell 会让 Node 把 DEP0190 警告塞进 stdout，JSON 就废了
 function call(args) {
   const r = spawnSync('node', [CLI, 'gateway', 'call', ...args], {
     shell: false, cwd: CWD, encoding: 'utf8', timeout: 45000,
@@ -35,7 +35,7 @@ function cliCall(args) {
   return { ok: r.status === 0, out: String(r.stdout || ''), err: String(r.stderr || '') };
 }
 
-// cron 表达式/间隔 → 一句人话（用户：别显示英文、也不知道是干嘛的）
+// cron 表达式/间隔 → 一句人话
 function whenText(sch) {
   if (!sch) return '未设';
   if (sch.kind === 'every') {
@@ -80,7 +80,7 @@ function kindText(k) {
   return k || '?';
 }
 
-// [2026-10-20 v18] provider → 中文归属（用户：分不清是 DS 官方还是云端服务商的 deepseek）
+// provider → 中文归属
 // 真相源：openclaw.json 里每个 provider 的 baseUrl。改 provider 域名时这张表也要改。
 const PROV = {
   scnet:    { tag: '云端',  full: '国家云端服务商 DeepSeek',  host: 'api.scnet.cn' },
@@ -133,7 +133,7 @@ function rowsFrom(jobs) {
       kind,
       kindText: kindText(kind),
       model: m,
-      // [2026-10-20 v18] 归属标签：云端 / DS官方 / 阿里云 / 本地 —— 用户一眼分辨
+// 归属标签：云端 / DS官方 / 阿里云 / 本地 —— 用户一眼分辨
       provTag: m ? pr.tag : '',
       provFull: m ? pr.full : '',
       provHost: m ? pr.host : '',
@@ -144,7 +144,7 @@ function rowsFrom(jobs) {
       needsModel: kind === 'agentTurn' || kind === 'heartbeat',
     };
   }).sort((a, b) =>
-    // [2026-10-19 v17] 用户要求：「要模型」的任务放上面，纯脚本放下面；停用的排最后
+// 「要模型」的任务放上面，纯脚本放下面；停用的排最后
     (b.enabled ? 1 : 0) - (a.enabled ? 1 : 0) || (b.needsModel ? 1 : 0) - (a.needsModel ? 1 : 0) || a.name.localeCompare(b.name, 'zh'));
 }
 
@@ -169,7 +169,7 @@ const cmd = (argv[0] || 'list').toLowerCase();
 const flag = (n) => { const i = argv.indexOf(n); return i >= 0 ? argv[i + 1] : ''; };
 const has = (n) => argv.includes(n);
 
-// [2026-10-20 v18] 实测：cron.list 默认只给「在跑」的 13 个；带 includeDisabled:true 才给全部 17 个
+// 实测：cron.list 默认只给「在跑」的 13 个；带 includeDisabled:true 才给全部 17 个
 // （停用里有 2 个要模型的 + 1 个心跳任务，用户怀疑「还有没分辨出来的」是对的）
 function fetchJobs() {
   let j = call(['cron.list', '--json', '--params', JSON.stringify({ limit: 100, includeDisabled: true }), '--timeout', '25000']);
@@ -216,11 +216,11 @@ if (cmd === 'set') {
   const oneId = flag('--id');
   const oneName = flag('--name');
   const all = rowsFrom(fetchJobs());
-  // [2026-10-20 v18] 「单个」模式：--id 或 --name 指定一个任务，只改它（用户：批量的要保留，个别的也要能做）
+// 「单个」模式：--id 或 --name 指定一个任务，只改它
   let targets;
   if (oneId || oneName) {
     const want = oneId || oneName;
-    // [2026-10-20 v18] 先精确同名；没有精确同名才退而求其次「包含」，且只取「要模型」的任务
+// 先精确同名；没有精确同名才退而求其次「包含」，且只取「要模型」的任务
     // （实测坑：--name 开机早报 曾把「开机早报触发器」也带上，那是纯脚本，不该改）
     const exact = all.filter(x => (oneId ? x.id === oneId : x.name === want));
     if (exact.length) targets = exact;

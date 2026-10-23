@@ -1,7 +1,4 @@
-// model-versions.cjs — 只读：读本机版本 + 官方最新，写 console-versions.json（页⑤用）
-// 用法：node model-versions.cjs [--out <文件>]
-// 本机：OpenClaw = npm 全局 package.json；Strata = <TIER_DIR>\engine\BUILD.json
-// 官方：GitHub Releases API（tag_name + published_at），失败则留空不崩
+// model-versions.cjs — 只读：本机版本 + 官方最新版本，写 console-versions.json
 const fs = require('node:fs');
 const path = require('node:path');
 

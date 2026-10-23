@@ -2,13 +2,13 @@
   "FixedFileInfo": {
     "FileVersion": {
       "major": 1,
-      "minor": 30,
+      "minor": 31,
       "patch": 0,
       "build": 0
     },
     "ProductVersion": {
       "major": 1,
-      "minor": 30,
+      "minor": 31,
       "patch": 0,
       "build": 0
     },
@@ -23,12 +23,12 @@
     "Charset": "Unicode (UTF-16)",
     "Comments": "模型服务控制台：大块头起停/换档、窗口换模型、定时任务改模型、显卡功率、显存实测校准、本机自检。绿色单文件，双击即用，不写注册表。",
     "CompanyName": "model-console",
-    "FileVersion": "1.30.0.0",
+    "FileVersion": "1.31.0.0",
     "InternalName": "model-console",
     "LegalCopyright": "MIT License",
     "OriginalFilename": "model-console.exe",
     "ProductName": "模型服务控制台",
-    "ProductVersion": "1.30.0.0（v30）",
+    "ProductVersion": "1.31.0.0（v31）",
     "FileDescription": "模型服务控制台（绿色单文件，双击即用）：大块头起停与换档、窗口换模型、定时任务改模型、显卡功率、显存实测校准、本机自检"
   },
   "VarFileInfo": {

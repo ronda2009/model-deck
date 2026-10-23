@@ -1,9 +1,4 @@
-// model-hb.cjs — 心跳与上下文压缩用哪个模型：读 / 改（v18，2026-10-20）
-// 用法：
-//   node model-hb.cjs get                       只读：现在心跳/压缩/主模型各是什么
-//   node model-hb.cjs set --model <provider/model> [--dry]   改心跳+压缩（先自动备份，改完读回确认）
-// 真相源：~/.openclaw/openclaw.json 里 agents.defaults.heartbeat.model / .compaction.model
-// 注意：这两项属「需重启网关」类（官方 hot-reload 文档），改完不会立刻生效。
+// model-hb.cjs — 读/改心跳与上下文压缩用的模型（写 openclaw.json，改前先备份）
 const fs = require('node:fs');
 const path = require('node:path');
 

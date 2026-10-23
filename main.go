@@ -1,10 +1,6 @@
-// model-console-launcher/main.go — 双击即开的启动器（v19：把程序文件封进 exe）
-// 编译：pwsh -File build-exe.ps1   （或 go build -ldflags "-H windowsgui" -o model-console.exe .）
-// 三个关键点：
-//   1) HideWindow = true —— 不设的话 GUI 程序启动控制台程序(pwsh)会自动开一个黑框（老板 2026-10-20 反馈）。
-//   2) -WindowStyle Hidden 必需 —— 否则 WinForms 主窗口不可见（2026-10-19 实测）。
-//   3) go:embed 把 ps1/cjs/json/README/vbs 封进二进制：只拷 exe 一个文件到任何位置也能跑，
-//      运行时释放到 %LOCALAPPDATA%\model-console\（同目录若已有 ps1，则优先用同目录的，方便就地改脚本）。
+// model-console-launcher/main.go — 双击即开的启动器：程序文件用 go:embed 封在 exe 里
+// 编译：pwsh -File build-exe.ps1（需要 Go 与 goversioninfo）
+// 同目录有 model-console.ps1 就用同目录那份，否则释放到 %LOCALAPPDATA%\model-console\
 package main
 
 import (
@@ -40,14 +36,14 @@ var packedNames = []string{
 	"model-versions.cjs",
 	"model-hb.cjs",
 	"model-detect.cjs",
-	// [2026-10-23 v30] 本机模型清单扫描器：页① 靠它把「清单里没列的 gguf」补进来（老板要求扫本机清单）
+// 本机模型清单扫描器：页① 靠它把「清单里没列的 gguf」补进来
 	"model-scan.cjs",
 	"console-paths.json",
 	"README.txt",
 	"打开控制台.vbs",
-	// [2026-10-22 v27] 档位清单示例：拷走单个 exe 也要能拿到它（复制成 console-tiers.json 就能自定义模型清单）
+// 档位清单示例：拷走单个 exe 也要能拿到它（复制成 console-tiers.json 就能自定义模型清单）
 	"console-tiers.example.json",
-	// [2026-10-22 v27] 许可也要跟着软件走：只拷 exe 时同样释放出来
+// 许可也要跟着软件走：只拷 exe 时同样释放出来
 	"LICENSE.txt",
 	"LICENSE-中文参考.txt",
 }
@@ -108,7 +104,7 @@ func extractTo(dir string) (bool, error) {
 			allOK = false
 		}
 	}
-	// [2026-10-21 v23] 关键修正：只有全部写成功才记指纹。
+// 关键修正：只有全部写成功才记指纹。
 	// 旧写法不管写没写成都把 .packed-hash 写成新版 → 下次启动以为「已是同一版」直接跳过，
 	// 结果界面还开着时那次没更新成功，之后关掉窗口也永远不会再更新（一直停在旧版）。
 	if allOK {

@@ -106,7 +106,7 @@ VRAM THRESHOLD AUTO-CALIBRATION (v22)
   Measured example: iq3x = 42680 MiB while the placeholder said 40450
   (2230 MiB optimistic -> "startable" shown but start could fail).
 
-WHY START-BIG FAILED BEFORE (v22 fixes, both were my bugs)
+WHY START-BIG FAILED BEFORE (v22 fixes)
 ----------------------------------------------------------
   A) Executor looked for strata-start-all-hidden.vbs / llama-router-start.ps1
      inside the console package dir ($PSScriptRoot), but they live in the TOOLS
@@ -119,8 +119,8 @@ WHY START-BIG FAILED BEFORE (v22 fixes, both were my bugs)
      console-paths.json.bak-v22). Verify with:
        pwsh -File <workspace>\docs\...\probes\check-paths-json.ps1
 
-STILL NOT DONE (owner decides): step 3 installer wizard - owner said do 1+2,
-  test them OK first, only then build 3.
+STILL NOT DONE: the installer wizard. It is deliberately left out until the
+  current build is confirmed on a second machine.
 
 ICON + FILE PROPERTIES (v23, 2026-10-21)
 -----------------------------------------
@@ -149,7 +149,7 @@ REFRESH BEHAVIOUR (v23)
     pops "previous task still running". That popup now also says how long
     the running task has been going.
 
-GREEN / PORTABLE (answer to owner question 3)
+GREEN / PORTABLE
 --------------------------------------------
   It already IS a green app: the exe carries all program files, double-click
   runs it, no installer, no registry writes. Data goes to the exe folder if
@@ -163,7 +163,7 @@ GREEN / PORTABLE (answer to owner question 3)
 
 HEADER CLIPPING FIX (v24, 2026-10-21)
 --------------------------------------
-  Owner: "the RAM / GPU / collect words look half covered". Measured with
+  Symptom: the RAM / GPU / "collect" words render half-covered. Measured with
   TextRenderer: label width 852 px, bold 11pt line height 19 px, label height
   30 px -> only ONE line fits; the v23 string measured 848 px (4 px of slack),
   so when a number grew by one digit the text wrapped and the 2nd line was cut
@@ -171,13 +171,13 @@ HEADER CLIPPING FIX (v24, 2026-10-21)
   "  |  " -> " | " (saves 48 px) => 772 px now (80 px slack); label height 34
   and AutoEllipsis=true so worst case shows "..." instead of half a glyph.
   The bare "@HH:MM:SS" is now labelled: "refreshed at HH:MM:SS" (time this
-  header row was last read) - owner asked what that unnamed time meant.
+  header row was last read).
   Version resource bumped to 1.24.0.0 / 1.24.0.0 (v24).
 
 FREEZE FIX (v25, 2026-10-21)
 -----------------------------
-  Owner: "I stopped the models with the console and the window froze; opening it
-  again froze too". Root cause: the UI thread read http://127.0.0.1:8080/
+  Symptom: models were stopped from the console, then the window froze; reopening
+  it froze too. Root cause: the UI thread read http://127.0.0.1:8080/
   __status SYNCHRONOUSLY with a 6 s timeout. Right after a service is stopped
   the port is often HALF-OPEN (it accepts but never answers) - measured 6049 ms
   per read. One refresh = 6049 (status) + 985 (port scan) + 77 (nvidia-smi) +
@@ -199,10 +199,9 @@ HIDDEN CONTROL CHARACTER FIXED (v25)
 
 WORDING CLEANED (v25)
 ---------------------
-  8 explanatory lines no longer mention internal workflow names (owner / ask
-  Moyun / upgrade-assistant / duty roster / cloud model). Kept: the model
-  names the owner named ("da kuai tou" family), real window titles, real
-  folder names. Version resource 1.25.0.0.
+  8 explanatory lines no longer mention internal workflow names. Kept: the
+  model family names chosen by the author, real window titles, real folder
+  names. Version resource 1.25.0.0.
 
 MICROSOFT / ANTIVIRUS CHECK (checked only, nothing changed yet)
 ---------------------------------------------------------------
@@ -228,19 +227,15 @@ MICROSOFT / ANTIVIRUS CHECK (checked only, nothing changed yet)
   - Heuristic risk profile of this design: single Go binary that extracts
     .ps1 files into %LOCALAPPDATA% and launches pwsh. Unsigned +
     self-extracting is what heuristics like to flag.
-  - Owner picked option (a) only, because it is free: manifest added in v28.
-    Still open: (b) code signing with a purchased certificate (costs money),
-    (c) submitting the file for reputation / whitelist. SHA256 of the shipped
-    exe is recorded in the project ledger.
+  - Only the free option was taken: the manifest was added in v28. Still open:
+    code signing with a purchased certificate, and submitting the file for
+    reputation / whitelist. SHA256 of the shipped exe is in SHA256.txt.
 
 RELEASE PREPARATION (v26, 2026-10-22)
 --------------------------------------
-  Owner decided the monetisation route: NO video (no time), main line =
-  sell "I set it up for you + Q&A" service on Goofish (owner already has a
-  shop there for madVR setup), GitHub as a free open-source business card.
-  Plan: docs/.../release-and-monetisation-plan.md (6 stages, each with an
-  acceptance criterion). Stage 0 (this version) = de-personalise + one-shot
-  release packaging. NOTHING in this working pack changes behaviour.
+  This version is the release-preparation step: the code was de-personalised
+  and packaging became a single command. NOTHING in this pack changes
+  behaviour.
 
   Hardcoded local username removed (4 places): desktop path now uses
   [Environment]::GetFolderPath(\'Desktop\'); the OpenClaw package/cli paths
@@ -267,8 +262,7 @@ RELEASE PREPARATION (v26, 2026-10-22)
   / what it is not / dependencies / first run / disclaimer), builds a
   neutral exe (Company "model-console", Copyright "MIT License"), zips it,
   prints SHA256, and re-checks syntax (both ps1 errors:0, all cjs --check).
-  Neutralisation report: 27 owner-mentions replaced in the UI script, and
-  the leftover check reports ZERO occurrences of the internal words.
+  The leftover check reports zero occurrences of the internal words.
 
   Release package verified as a "first run on a new machine": ran the
   release exe with LOCALAPPDATA pointed at a throwaway folder (children
@@ -281,7 +275,7 @@ RELEASE PREPARATION (v26, 2026-10-22)
   Sizes and hashes: the working exe grew from 3,495,936 bytes; this build is
   FileVersion 1.26.0.0. Exact byte sizes and SHA256 of the working exe, the
   release exe and the release zip are listed in SHA256.txt next to the zip, and
-  in the project ledger. They are deliberately NOT written inside this README:
+  in SHA256.txt. They are deliberately NOT written inside this README:
   this README is embedded in the exe, so quoting the exe hash here is circular
   (editing the text changes the hash). The build is STILL UNSIGNED.
 
@@ -426,6 +420,17 @@ v30 - THE PROGRAM NOW LOOKS AT THE MACHINE IT IS ON
   when no port is listening; presence check marks a missing .gguf as absent and
   leaves rows alone when the folder is missing; the scroll probe drags to the
   last row with 13 models and shows no scrollbar at 11 or fewer.
+
+v31 - COMMENT TRIM AND OUTWARD-FACING WORDING
+---------------------------------------------
+  No behaviour change. Comments in the scripts were trimmed: build dates,
+  version tags and restated user requests were removed; each file header was
+  shortened to one or two lines. Every non-comment line was compared before
+  and after and is byte-for-byte identical (checked by script, not by eye).
+  This README was cleaned the same way: it no longer quotes the author's own
+  requests, his monetisation plan or internal workflow names.
+  The repository was renamed from model-console to model-deck; the old URL
+  still redirects.
 
 LICENSE
 --------------------------------------------------

@@ -102,7 +102,7 @@ PowerShell 7 有两种装法：**MSI** 装在 `C:\Program Files\PowerShell\7\pws
 
 扫码或[点这个链接直达付款页](https://qr.alipay.com/fkx13840f42u5aj2vrhkh5c)。
 
-为什么不用 GitHub Sponsors：实测 GitHub 官方「支持地区」清单里**没有中国大陆**，中国大陆账号目前开不了官方收款（只能排 waitlist）；而且国内朋友得有国际 Visa/MasterCard 才能付，银联不行。所以这里挂的是支付宝收款码。
+（挂支付宝码而不是 GitHub Sponsors：GitHub 的「支持地区」清单里没有中国大陆。）
 
 ---
 
@@ -116,8 +116,15 @@ MIT（见 `LICENSE.txt`；`LICENSE-中文参考.txt` 是非官方中文参考，
 
 ## 下载 / Download
 
-看 **Releases**：`model-console-v30-windows.zip`（约 2.0 MB，含 exe + 两份示例配置（路径 / 模型清单）+ README + LICENSE + `SHA256.txt`）。
+看 **Releases**：下载最新的 `model-deck-vNN-windows.zip`（约 2.0 MB，含 exe + 两份示例配置（路径 / 模型清单）+ README + LICENSE + `SHA256.txt`）。
 
-## 这个版本的状态 / Status
+## 版本 / Versions
 
-v26 是**第一个对外发布版**；v27 把「模型清单」做成可外置（不改就跟以前一样）；v28 给 exe 加了应用程序清单（免费那条，**仍**未签名）；**v29 修了一个真 bug**：PowerShell 7 若是从**微软商店**装的（不是 MSI），以前点任何按钮都报「系统找不到指定的文件」，见下节。主要在我自己这台机器上日常使用（RTX 3090 + RTX 3080 双卡，Strata 引擎 + llama.cpp + OpenClaw）。**v30 把三处「我机器上长这样」改成看现场**（认官方 Strata 的 `/health`、自己找端口、扫本机模型清单 + 标灰 + 卡片内滚动），见上节。**未签名**，**只在 Windows 上测过**。有问题欢迎开 issue。
+- **v26** — 第一个对外发布版
+- **v27** — 档位清单可以外置，不放文件就跟以前一样
+- **v28** — exe 内嵌 Windows 应用程序清单（仍未数字签名）
+- **v29** — 修了个真 bug：商店版 PowerShell 7 会让所有按钮报「系统找不到指定的文件」，见上节
+- **v30** — 三处「我机器上长这样」改成看现场：认官方 Strata 的 `/health`、自己找端口、扫本机模型清单（标灰 + 卡片内滚动），见上节
+- **v31** — 只清注释和文案，功能没动；仓库改名 `model-deck`
+
+主要在我自己这台机器上日常使用（RTX 3090 + RTX 3080 双卡，Strata + llama.cpp + OpenClaw）。**未签名**，**只在 Windows 上测过**。有问题欢迎开 issue。

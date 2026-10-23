@@ -1,14 +1,14 @@
 // model-windows.cjs —— OpenClaw 各窗口（会话）模型批量切换工具
 // 被「模型服务控制台」的执行器调用，也可手动跑。
 //   node model-windows.cjs list                          # 列对话窗口：谁在用哪个模型、上下文多少
-//   node model-windows.cjs list --scope sys              # 列定时任务/心跳窗口（v15）
+//   node model-windows.cjs list --scope sys # 列定时任务/心跳窗口
 //   node model-windows.cjs list --scope all              # 两类都列
 //   node model-windows.cjs set --model strata/qwen3.8-flash-next-iq2x            # 换所有对话窗口
-//   node model-windows.cjs set --model ... --scope sys   # 只换定时任务/心跳窗口（v15：云端来回切）
+//   node model-windows.cjs set --model ... --scope sys # 只换定时任务/心跳窗口
 //   node model-windows.cjs set --model ... --sys         # 对话 + 系统窗口都换
 //   node model-windows.cjs set --model ... --compact    # 换完再压缩上下文（防切小模型爆上下文）
 //   node model-windows.cjs set --model ... --dry        # 只报「会换谁」，不动任何窗口
-//   node model-windows.cjs models                        # 列可用模型及其上下文上限（v15）
+//   node model-windows.cjs models # 列可用模型及其上下文上限
 // 原理：走网关 RPC sessions.list / sessions.patchMany（一次调用改多个窗口，实测 2 秒改 3 个）
 // 注意：换模型不重启服务、不中断正在跑的回答（网关把切换排队到下一次安全时机）
 const { spawn } = require('node:child_process');
@@ -16,7 +16,7 @@ const os = require('node:os');
 const fs = require('node:fs');
 const path = require('node:path');
 
-// [2026-10-19 v15] 找 openclaw 命令行入口（本机实测：直接 spawn `openclaw` + shell:true 会
+// 找 openclaw 命令行入口（本机实测：直接 spawn `openclaw` + shell:true 会
 //   把 DEP0190 弃用警告混进 stdout，导致 JSON 解析失败 → 界面「刷新列表」出不来）。
 //   现在优先用 node + openclaw.mjs（shell:false，无警告、无引号问题），找不到才退回 shell:true。
 function cliPath() {
@@ -54,7 +54,7 @@ function call(method, paramsObj, timeoutMs) {
   });
 }
 
-// [2026-10-19 v14] 目标模型的上下文上限：实测本机 strata 五档 = 262144，llamacpp 27B = 131072。
+// 目标模型的上下文上限：实测本机 strata 五档 = 262144，llamacpp 27B = 131072。
 //   切到上限更短的模型时，旧窗口已用量可能超过新上限 → 必须先压上下文，否则一开口就爆。
 async function modelCap(modelRef) {
   const r = await call('models.list', {}, 60000);

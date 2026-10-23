@@ -1,8 +1,4 @@
-// model-scan.cjs — [2026-10-23 v30] 扫本机模型盘，把清单里没有的 gguf 补进页① 启停清单
-// 用法：node model-scan.cjs --out console-tiers.scanned.json
-// 规则：扫 console-paths.json 的 MODELS（没配就扫常见位置），递归两层找 *.gguf；
-//   跳过 mmproj 与清单里已用到的；名字带 vl/vision/clip 的当视觉条目，其余当对话条目；
-//   显存门槛按文件大小粗估（GiB×1024 + 2048），界面再用实测校准覆盖
+// model-scan.cjs — 扫本机模型盘，把启停清单里没有的 .gguf 补成条目（缓存到 console-tiers.scanned.json）
 const fs = require('node:fs');
 const path = require('node:path');
 

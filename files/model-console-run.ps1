@@ -1,25 +1,13 @@
-# D:\06.AItools\model-console-run.ps1 —— 模型服务控制台的「执行器」
-# 控制台（model-console.ps1）只做界面；所有真正的起停动作在这里，按「只动指定对象」的原则写。
-# 用法（控制台内部调用，也可以手动跑）：
-#   pwsh -File model-console-run.ps1 status
-#   pwsh -File model-console-run.ps1 start-big   -Key iq3s            # 大块头某档（双卡合扛）
-#   pwsh -File model-console-run.ps1 stop-big
-#   pwsh -File model-console-run.ps1 start-27b   -Key b27bx -Gpu 0    # 走 :8090 路由（OpenClaw 已注册）
-#   pwsh -File model-console-run.ps1 stop-27b
-#   pwsh -File model-console-run.ps1 start-vl    -Gpu 1               # 视觉 :8096（[2026-10-19 v14] 旧注释写 8101，已统一 8096）
-#   pwsh -File model-console-run.ps1 stop-vl
-#   pwsh -File model-console-run.ps1 stop-all
-#   pwsh -File model-console-run.ps1 clear-cache
-#   pwsh -File model-console-run.ps1 reserve -First 1536 -Later 300
-#   pwsh -File model-console-run.ps1 gw | gw-hard
-#   pwsh -File model-console-run.ps1 win-list                          # 读各对话窗口当前模型（只读）
-#   pwsh -File model-console-run.ps1 win-set -Key strata/qwen3.8-flash-next-iq2x        # 换所有对话窗口
-#   pwsh -File model-console-run.ps1 win-set -Key <模型> -Compact      # 换完再压上下文（切小模型时用）
-#   pwsh -File model-console-run.ps1 win-set -Key <模型> -Sys          # 连系统/定时任务窗口一起换
-#   pwsh -File model-console-run.ps1 sys-list                           # 读定时任务/心跳窗口（只读）
-#   pwsh -File model-console-run.ps1 sys-set -Key scnet/DeepSeek-V4.1-Flash   # 只换定时任务/心跳（云端来回切）
-#   pwsh -File model-console-run.ps1 sys-set -Key <模型> -ChatToo        # 上面 + 连对话窗口一起换
-#   加 -DryRun = 只报「会动谁」，一个进程都不动
+# model-console-run.ps1 — 执行器：起停动作都在这里，界面（model-console.ps1）只调它
+# 用法（控制台内部调用，也可手动跑）：
+#   status | stop-all | clear-cache | gw | gw-hard
+#   start-big -Key <档> | stop-big
+#   start-27b -Key <档> -Gpu 0 | stop-27b
+#   start-vl -Gpu 1 | stop-vl
+#   reserve -First 1536 -Later 300
+#   win-list | win-set -Key <模型> [-Compact | -Sys]
+#   sys-list | sys-set -Key <模型> [-ChatToo]
+#   加 -DryRun：只报「会动谁」，不动任何进程
 param(
   [string]$Action = 'status',
   [int]$Watts = 0,
@@ -31,19 +19,19 @@ param(
   [switch]$Sys,
   [switch]$ChatToo,
   [switch]$DryRun,
-  [string]$JobName = ''   # [2026-10-20 v18] cron-set-one：只改这一个任务
+  [string]$JobName = ''   # cron-set-one：只改这一个任务
 )
 $ErrorActionPreference = 'Continue'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
-# ---------- [2026-10-19 v15] 便携包：状态/日志/缓存写自己文件夹 ----------
+# 便携包：状态/日志/缓存写自己文件夹 ----------
 # 下面绝对路径可被同目录 console-paths.json 覆盖（换机器只改那个文件，不改代码）。
 $PACKDIR  = $PSScriptRoot
 $PATHF    = Join-Path $PACKDIR 'console-paths.json'
 $BASE     = $PACKDIR
-# [2026-10-20 v22] 启动脚本（strata-router.py / strata-start-all-hidden.vbs / llama-router-start.ps1）不在本包里，
+# 启动脚本（strata-router.py / strata-start-all-hidden.vbs / llama-router-start.ps1）不在本包里
 #   而在工具目录（本机 = D:\06.AItools）。旧代码用 Join-Path $BASE 找它们 → 找不到 → 起大块头报一堆错。
-$TOOLDIR  = 'D:\06.AItools'   # [2026-10-21 v25] 修隐藏坏字符（原为 'D:' + 0x06 + '.AItools'）
+$TOOLDIR  = 'D:\06.AItools'   # 修隐藏坏字符（原为 'D:' + 0x06 + '.AItools'）
 $NODE     = 'node'
 $SELFJS   = Join-Path $PACKDIR 'model-detect.cjs'
 $SELFF    = Join-Path $PACKDIR 'console-selfcheck.json'
@@ -56,7 +44,7 @@ $WS       = Join-Path $PACKDIR 'logs'
 $GWRESCUE = 'D:\06.AItools\openclaw\workspace\tools\gateway-rescue.ps1'
 $CACHECLR = 'D:\06.AItools\strata-cache-clear.ps1'
 $LLMSVC   = 'D:\06.AItools\llm-service.ps1'
-# [2026-10-23 v29] pwsh 位置运行时解析（商店版在 WindowsApps 下，写死 MSI 路径在别人机器上不存在）。
+# pwsh 位置运行时解析（商店版在 WindowsApps 下，写死 MSI 路径在别人机器上不存在）。
 #   顺序 $PSHOME → MSI 默认 → PATH；console-paths.json 的 PWSH 可覆盖。
 $mcPsHome = if ($PSHOME -and (Test-Path (Join-Path $PSHOME 'pwsh.exe'))) { Join-Path $PSHOME 'pwsh.exe' } else { '' }
 $mcPsMsi   = 'C:\Program Files\PowerShell\7\pwsh.exe'
@@ -65,12 +53,12 @@ $PWSH       = if ($mcPsHome) { $mcPsHome } elseif (Test-Path $mcPsMsi) { $mcPsMs
 $WINCJS   = Join-Path $PACKDIR 'model-windows.cjs'
 $WINF     = Join-Path $PACKDIR 'console-windows.json'
 $SYSF     = Join-Path $PACKDIR 'console-syswindows.json'
-$CRONJS   = Join-Path $PACKDIR 'model-crons.cjs'      # [2026-10-19 v16] 定时任务定义清单与换模型工具
-$CRONF    = Join-Path $PACKDIR 'console-crons.json'   # [2026-10-19 v16] 定时任务定义缓存（界面读）
-$HBF      = Join-Path $PACKDIR 'console-hbmodel.json' # [2026-10-19 v16] 心跳/压缩模型（只读 openclaw.json）
-$VERJS    = Join-Path $PACKDIR 'model-versions.cjs'   # [2026-10-20 v17] 版本与官方链接采集（页⑤）
-$VERF     = Join-Path $PACKDIR 'console-versions.json' # [2026-10-20 v17] 版本缓存（界面读）
-$HBCJS    = Join-Path $PACKDIR 'model-hb.cjs'      # [2026-10-20 v18] 心跳/压缩模型读写（openclaw.json）
+$CRONJS   = Join-Path $PACKDIR 'model-crons.cjs'      # 定时任务定义清单与换模型工具
+$CRONF    = Join-Path $PACKDIR 'console-crons.json'   # 定时任务定义缓存（界面读）
+$HBF      = Join-Path $PACKDIR 'console-hbmodel.json' # 心跳/压缩模型（只读 openclaw.json）
+$VERJS    = Join-Path $PACKDIR 'model-versions.cjs'   # 版本与官方链接采集（页⑤）
+$VERF     = Join-Path $PACKDIR 'console-versions.json' # 版本缓存（界面读）
+$HBCJS    = Join-Path $PACKDIR 'model-hb.cjs'      # 心跳/压缩模型读写（openclaw.json）
 if (Test-Path $PATHF) {
   try {
     $pj = Get-Content $PATHF -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -82,7 +70,7 @@ if (Test-Path $PATHF) {
 }
 
 # ---------- 模型登记表（顺序 = 桌面 bat 菜单顺序） ----------
-# [2026-10-22 v27] 与界面共用外置清单 console-tiers.json，读不到用内置表；nameRun/needRun 不给就用 name/need。
+# 与界面共用外置清单 console-tiers.json，读不到用内置表；nameRun/needRun 不给就用 name/need。
 #   别和 console-models.json 搞混：那是页③「可换模型」下拉的缓存（本文件 model-list 生成）。
 $REG_DEF = @{
   'iq2x'  = @{ name='大块头 IQ2X（无删减 IQ2_XS）·默认'; need=42100; dual=$true;  engine='strata'; tier='iq2x' ; act='big'  }
@@ -132,7 +120,7 @@ if (Test-Path $MODELSF) {
   } catch { Write-Host ('  档位清单 console-tiers.json 读不了（多半是 JSON 写法不对：Windows 路径的反斜杠要写两个）：' + $_.Exception.Message + ' —— 本次改用内置表') }
 }
 
-# ---------- [2026-10-23 v30] 本机扫描清单：与界面读同一份 console-tiers.scanned.json，否则列了却起不来 ----------
+# 本机扫描清单：与界面读同一份 console-tiers.scanned.json，否则列了却起不来 ----------
 $scanf = Join-Path $PACKDIR 'console-tiers.scanned.json'
 if (Test-Path $scanf) {
   try {
@@ -164,7 +152,7 @@ if (Test-Path $scanf) {
 }
 
 # ---------- 原子工具 ----------
-# [2026-10-22 v27] 视觉模型不再写死 vl8/8096：从登记表里找 act=vl 的那条；没给 port 就用 8096
+# 视觉模型不再写死 vl8/8096：从登记表里找 act=vl 的那条；没给 port 就用 8096
 function VlKey { foreach ($k in $ORDER) { if ($REG[$k].act -eq 'vl') { return $k } } return '' }
 function VlPort([string]$k) { if ($k -and $REG[$k].port) { return [int]$REG[$k].port } return 8096 }
 # 27B 路由端口 8090 是 OpenClaw 注册死的，不能换；视觉端口跟着清单走
@@ -176,7 +164,7 @@ function PortPid([int]$port) {
   if ($c.Count -eq 0) { return $null }
   return $c[0].OwningProcess
 }
-# [2026-10-23 v30] 大块头端口不写死 8080（官方 Strata 默认 8095）；配置 BIGPORT 优先，否则探 /health
+# 大块头端口不写死 8080（官方 Strata 默认 8095）；配置 BIGPORT 优先，否则探 /health
 if (-not $BIGPORT) { $BIGPORT = 8080 }
 $global:BIGPORT = [int]$BIGPORT
 function BigPortProbe {
@@ -241,7 +229,7 @@ function Scan-Strata {
     })
 }
 function TierFromModel([string]$m) {
-  # [2026-10-23 v30] 与界面同一套：把引擎报的模型名对回清单里的档位名；对不上就原样返回
+# 与界面同一套：把引擎报的模型名对回清单里的档位名；对不上就原样返回
   if (-not $m) { return '' }
   $mm = ([string]$m).ToLower()
   $tiers = @()
@@ -256,7 +244,7 @@ function TierFromModel([string]$m) {
   return $m
 }
 function StrataStatus {
-  # [2026-10-23 v30] /__status 是自建路由私有接口，官方 Strata 没有 → 别人机器上恒为 null；问不到改问官方 /health。
+# /__status 是自建路由私有接口，官方 Strata 没有 → 别人机器上恒为 null；问不到改问官方 /health。
   try { return (Invoke-WebRequest ('http://127.0.0.1:' + $global:BIGPORT + '/__status') -TimeoutSec 6 -UseBasicParsing | ConvertFrom-Json) } catch { }
   try {
     $hv = Invoke-WebRequest ('http://127.0.0.1:' + $global:BIGPORT + '/health') -TimeoutSec 6 -UseBasicParsing | ConvertFrom-Json
@@ -272,7 +260,7 @@ function StrataStatus {
   return $null
 }
 function ToolFile([string]$name) {
-  # [2026-10-20 v22] 在工具目录找脚本；找不到就在常见位置兜底（换机器不至于直接瘫）
+# 在工具目录找脚本；找不到就在常见位置兜底（换机器不至于直接瘫）
   $c = @( (Join-Path $TOOLDIR $name), (Join-Path $PACKDIR $name), (Join-Path (Split-Path $TIER_DIR -Parent) $name), (Join-Path 'D:\06.AItools' $name) )
   foreach ($p in $c) { if (Test-Path $p) { return $p } }
   return ''
@@ -318,11 +306,11 @@ function Ensure-StrataRouter {
   if (Up $global:BIGPORT) { return $true }
   Write-Host '  拉起大块头 router + keeper ...'
   if ($DryRun) { Write-Host '  [DryRun] 会跑 strata-start-all-hidden.vbs'; return $true }
-  # [2026-10-20 v22] 原来写 Join-Path $BASE（= 控制台包目录），但启动 vbs 在工具目录 → 永远找不到，
-  #   于是报「8080 没起来」+「switch 异常：由于目标计算机积极拒绝」，用户只能去用 bat 启动。
+# 原来写 Join-Path $BASE（= 控制台包目录），但启动 vbs 在工具目录 → 永远找不到
+#   于是报「8080 没起来」+「switch 异常：由于目标计算机积极拒绝」，用户只能去用 bat 启动。
   $vbs = ToolFile 'strata-start-all-hidden.vbs'
   if (-not $vbs) {
-    # [2026-10-23 v30] 没有自建路由 = 官方 Strata 机器。这里先不起：档位由后面的 Switch-Tier 定，
+# 没有自建路由 = 官方 Strata 机器。这里先不起：档位由后面的 Switch-Tier 定
     #   在这里起等于不知道要哪个档（会随机挑一个配置文件）。
     Write-Host '  没找到自建路由的启动脚本 → 这台是官方 Strata，起哪个档交给换档那步办'
     return $true
@@ -333,7 +321,7 @@ function Ensure-StrataRouter {
   Write-Host ('   :' + $global:BIGPORT + ' 已就绪')
   return $true
 }
-# [2026-10-23 v30] 没有自建路由的机器（官方 Strata）：按官方方式起 —— 读官方目录里的 run-<档>.bat，
+# 没有自建路由的机器（官方 Strata）：按官方方式起 —— 读官方目录里的 run-<档>.bat
 #   或 python serve\server.py --engine strata --config <档位json> --port <端口>。
 function OfficialStart([string]$tier) {
   $bat = ''
@@ -370,7 +358,7 @@ function OfficialStart([string]$tier) {
 function Switch-Tier([string]$tier) {
   Write-Host ('  切到 ' + $tier + ' 并上卡（约 40–90 秒，请稍候）...')
   if ($DryRun) { Write-Host '  [DryRun] 会 GET /__switch?tier=' + $tier; return $true }
-  # [2026-10-23 v30] 官方 Strata 没有 /__switch：换档 = 按那个档位的配置重新起（先卸再起）
+# 官方 Strata 没有 /__switch：换档 = 按那个档位的配置重新起（先卸再起）
   #   端口压根没在听时也别去 GET /__switch（会 404 再白 ping 300 秒），直接按官方方式起
   if (-not (Up $global:BIGPORT)) { return (OfficialStart $tier) }
   $s0 = $null
@@ -435,7 +423,7 @@ function Start-27b([string]$key, [int]$gpuIdx) {
     Write-Host ('  停 :8090 路由（原卡 ' + $(if ($cur) { $cur.gpu } else { '未知' }) + ' → 新卡 ' + $gpuIdx + '）')
     KillPort 8090
     if ($DryRun) { Write-Host '  [DryRun] 会跑 llama-router-start.ps1 -Gpu ' + $gpuIdx; return $true }
-    # [2026-10-20 v22] 同样问题：脚本在工具目录，不在包内
+# 同样问题：脚本在工具目录，不在包内
     $rs = ToolFile 'llama-router-start.ps1'
     if (-not $rs) { Write-Host '  ✗ 找不到 llama-router-start.ps1（工具目录不对）' -ForegroundColor Red; return $false }
     & $rs -Port 8090 -Gpu $gpuIdx
@@ -453,7 +441,7 @@ function Start-27b([string]$key, [int]$gpuIdx) {
 }
 
 # ---------- 安全垫 ----------
-# [2026-10-19 v13] 读回工具：从档位 JSON 里取出实际写入的两个值（写完必须读回验证，不盲信写入成功）
+# 读回工具：从档位 JSON 里取出实际写入的两个值（写完必须读回验证，不盲信写入成功）
 function Read-ReserveValues([string]$path) {
   $t = Get-Content $path -Raw
   $vf = $null; $vl = $null
@@ -489,7 +477,7 @@ function Write-Reserve([int]$f, [int]$l) {
   return $changed
 }
 
-# [2026-10-19 v13] 回滚：把 .reserve-bak 里最新一批备份拷回档位目录
+# 回滚：把 .reserve-bak 里最新一批备份拷回档位目录
 function Restore-ReserveLatest {
   $bak = Join-Path $TIER_DIR '.reserve-bak'
   $all = @()
@@ -511,7 +499,7 @@ function Show-State {
   Write-Host '=== 实时状态 ==='
   $s = StrataStatus
   if ($s) { Write-Host ('  大块头 :' + $global:BIGPORT + '  当前档 ' + $s.current + '  pid ' + $s.pid) } else { Write-Host ('  大块头 :' + $global:BIGPORT + '  停') }
-  foreach ($port in (LlamaPorts)) {   # [2026-10-22 v27] 视觉端口跟着清单走
+  foreach ($port in (LlamaPorts)) {   # 视觉端口跟着清单走
     $ps = [string]$port
     if (Up $port) { Write-Host ('  :' + $ps + ' 在跑  pid ' + (PortPid $port)) } else { Write-Host ('  :' + $ps + ' 停') }
   }
@@ -604,7 +592,7 @@ switch ($Action) {
   'stop-all' {
     Write-Host '  全停：大块头 + 27B 路由 + 视觉（腾空两卡）'
     [void](Stop-StrataOnly)
-    foreach ($p in (LlamaPorts)) { KillPort $p }   # [2026-10-22 v27] 视觉端口跟着清单走
+    foreach ($p in (LlamaPorts)) { KillPort $p }   # 视觉端口跟着清单走
     Show-State
   }
   'clear-cache' {
@@ -625,7 +613,7 @@ switch ($Action) {
     [void](Restart-StrataImpl)
   }
   'reserve-rollback' {
-    # [2026-10-19 v13] 一键回滚安全垫：拷回最新一批备份 → 读回确认 → 重启大块头
+# 一键回滚安全垫：拷回最新一批备份 → 读回确认 → 重启大块头
     $bak = Join-Path $TIER_DIR '.reserve-bak'
     $peek = @()
     if (Test-Path $bak) { $peek = @(Get-ChildItem $bak -Filter 'strata-*.json.*' | Sort-Object LastWriteTime) }
@@ -655,14 +643,14 @@ switch ($Action) {
   'gw' { Write-Host '  网关救援（优雅优先）'; & $PWSH -NoProfile -File $GWRESCUE }
   'gw-hard' { Write-Host '  网关救援（硬清理）'; & $PWSH -NoProfile -File $GWRESCUE -Hard }
   'versions' {
-    # [2026-10-20 v17] 只读：读本机版本 + 官方最新 release，写 console-versions.json 供页⑤显示
+# 只读：读本机版本 + 官方最新 release，写 console-versions.json 供页⑤显示
     Write-Host '  读版本与官方链接（只读，需联网）'
     $raw = (& node $VERJS --out $VERF 2>&1 | Out-String).Trim()
     Write-Host ('  ' + ($raw -join [char]10))
     if (Test-Path $VERF) { Write-Host '  已写 console-versions.json' } else { Write-Host '  未写出缓存（页⑤仍显示本机版本）' }
   }
   'model-list' {
-    # [2026-10-19 v17] 只读：列可换的模型（本地+云端），node 直接落盘 console-models.json 供界面下拉菜单
+# 只读：列可换的模型（本地+云端），node 直接落盘 console-models.json 供界面下拉菜单
     Write-Host '  读可换模型清单（只读）'
     $raw = (& node $WINCJS models --json --out (Join-Path $PACKDIR 'console-models.json') 2>&1 | Out-String).Trim()
     if (-not $raw.StartsWith('[')) { Write-Host ('  读失败：' + $raw.Substring(0, [Math]::Min(160, $raw.Length))); break }
@@ -671,7 +659,7 @@ switch ($Action) {
     foreach ($w in $rows) { Write-Host ('    ' + $w.provider + '/' + $w.key + ' | ' + $w.name + ' | ' + $(if ($w.local) { '本地' } else { '云端' })) }
   }
   'power' {
-    # [2026-10-20 v19] 修两处：①读上限的命令写错（-q 不认 --format=csv,noheader,nounits，日志里全是 ERROR）
+# 修两处：①读上限的命令写错（-q 不认 --format=csv,noheader,nounits，日志里全是 ERROR）
     #   ②写功率要管理员权限：双击打开本程序时是普通权限，nvidia-smi 会报 Insufficient Permissions（exit 87 让界面去提权重试）
     if ($Watts -le 0) { Write-Host '  缺 -Watts <瓦>'; exit 1 }
     $smi = if ($Gpu -ge 0) { $Gpu } else { 0 }
@@ -693,7 +681,7 @@ switch ($Action) {
     Write-Host ('  读回确认：显卡' + ($smi + 1) + ' 现上限 ' + $back + ' W')
   }
   'cron-list' {
-    # [2026-10-19 v16] 只读：定时任务「定义」清单（中文名 + 何时跑 + 用哪个模型）+ 心跳/压缩模型
+# 只读：定时任务「定义」清单（中文名 + 何时跑 + 用哪个模型）+ 心跳/压缩模型
     Write-Host '  读定时任务定义（只读，不改任何任务）'
     $raw = (& node $CRONJS list --out $CRONF --hbfile $HBF 2>&1 | Out-String).Trim()
     if (-not $raw.StartsWith('[')) { Write-Host ('  读失败：' + $raw.Substring(0, [Math]::Min(160, $raw.Length))); break }
@@ -711,8 +699,8 @@ switch ($Action) {
     }
   }
   'cron-set' {
-    # [2026-10-19 v16] 换「定时任务定义」里的模型：只改「要模型」的任务；纯脚本任务不调用模型，不动；
-    #   心跳与压缩在 openclaw.json（改需网关重启），本动作不碰 —— 符合用户 2026-10-16 的决定
+# 换「定时任务定义」里的模型：只改「要模型」的任务；纯脚本任务不调用模型，不动；
+#   心跳与压缩在 openclaw.json（改需网关重启），本动作不碰 —— 符合用户 2026-10-16 的决定
     if (-not $Key) { Write-Host '  缺目标模型'; exit 1 }
     if ($DryRun) {
       Write-Host ('  [DryRun] 会把「要模型」的定时任务换成 ' + $Key)
@@ -727,7 +715,7 @@ switch ($Action) {
       & node $WINCJS set --model $Key --scope chat 2>&1
     }
   }
-  'cron-set-one' {   # [2026-10-20 v18] 只改一个定时任务的模型（用户：批量要保留，个别也要能改）
+  'cron-set-one' {   # 只改一个定时任务的模型
     if (-not $Key) { Write-Host '  缺目标模型'; exit 1 }
     if (-not $JobName) { Write-Host '  缺 -JobName <任务名>'; exit 1 }
     if ($DryRun) {
@@ -742,7 +730,7 @@ switch ($Action) {
     [void](& node $CRONJS list --out $CRONF --hbfile $HBF 2>&1 | Out-String)
     Write-Host '  已读回 console-crons.json'
   }
-  'hb-set' {   # [2026-10-20 v18] 改心跳与压缩模型（写 openclaw.json，先自动备份，改完需重启网关）
+  'hb-set' {   # 改心跳与压缩模型（写 openclaw.json，先自动备份，改完需重启网关）
     if (-not $Key) { Write-Host '  缺目标模型'; exit 1 }
     if ($DryRun) { Write-Host ('  [DryRun] 会把心跳与压缩改成 ' + $Key + '（需重启网关才生效）'); & node $HBCJS set --model $Key --dry 2>&1; break }
     $r2 = (& node $HBCJS set --model $Key 2>&1 | Out-String)
@@ -750,17 +738,17 @@ switch ($Action) {
     Write-Host '  提醒：这两项属「需重启网关」类，重启后才生效（重启前先确认）'
   }
   'detect' {
-    # [2026-10-20 v22] 本机环境自检（只报告，不改配置）
+# 本机环境自检（只报告，不改配置）
     Write-Host '  本机环境自检（只读，不改任何配置）'
     & node $SELFJS --out $SELFF 2>&1
   }
   'detect-write' {
-    # [2026-10-20 v22] 自检 + 把「当前值在本机不存在」的路径用探测到的真值写回 console-paths.json（自动备份 .bak-detect-*）
+# 自检 + 把「当前值在本机不存在」的路径用探测到的真值写回 console-paths.json（自动备份 .bak-detect-*）
     Write-Host '  本机环境自检并修正路径（会先备份 console-paths.json）'
     & node $SELFJS --out $SELFF --write 2>&1
   }
   'calib' {
-    # [2026-10-20 v22] 显存实测自动校准：当前在跑哪档，就量它实际占多少显存（两卡求和），输出「tier,占用MiB」供界面写门槛
+# 显存实测自动校准：当前在跑哪档，就量它实际占多少显存（两卡求和），输出「tier,占用MiB」供界面写门槛
     Write-Host '  显存实测（只读，不动服务）'
     $s = StrataStatus
     if (-not $s -or -not $s.current) { Write-Host '  大块头没在跑，量不到（起一档再跑）'; break }
@@ -774,7 +762,7 @@ switch ($Action) {
     Write-Host ([string]$s.current + ',' + [string]$sum)
   }
   'win-list' {
-    # [2026-10-19 v14] 只读：读各对话窗口当前用哪个模型，写缓存文件供界面填列表
+# 只读：读各对话窗口当前用哪个模型，写缓存文件供界面填列表
     Write-Host '  读各窗口当前模型（只读，不动任何窗口）'
     # 让 node 自己落盘（--out）：PowerShell 重定向/Set-Content 会把 UTF-8 二次编码，中文窗口名会变乱码
     $raw = (& node $WINCJS list --json --out $WINF 2>&1 | Out-String).Trim()
@@ -788,10 +776,10 @@ switch ($Action) {
     }
   }
   'win-set' {
-    # [2026-10-19 v14] 一键换所有对话窗口的模型；不重启服务、不中断正在跑的回答
+# 一键换所有对话窗口的模型；不重启服务、不中断正在跑的回答
     if (-not $Key) { Write-Host '  缺目标模型'; exit 1 }
     if ($DryRun) {
-      # [2026-10-19 v14] DryRun 也要把 -Compact / -Sys 传下去，不然「勾了但走查里看不到」会误导
+# DryRun 也要把 -Compact / -Sys 传下去，不然「勾了但走查里看不到」会误导
       Write-Host ('  [DryRun] 会把所有对话窗口换成 ' + $Key + '（一个窗口也不动）')
       $dargs = @($WINCJS, 'set', '--model', $Key, '--dry')
       if ($Compact) { $dargs += '--compact' }

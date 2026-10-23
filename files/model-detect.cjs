@@ -1,6 +1,4 @@
-// model-detect.cjs — 本机环境自检 + 路径自动定位（v22，用户要的 ①自动找路径 + ②自检）
-// 用法：node model-detect.cjs --out <json> [--write]
-//   --write：把「当前值在本机不存在」的路径键，用探测到的真值替换（先备份 console-paths.json.bak-detect-<时间戳>）
+// model-detect.cjs — 本机环境自检与路径自动定位：pwsh / node / nvidia-smi / openclaw / Strata / llama-server / 模型盘
 const fs = require('node:fs');
 const path = require('node:path');
 const net = require('node:net');
@@ -96,7 +94,7 @@ async function main() {
 
   // 服务在跑状态
   const p8080 = await portOpen(8080);
-// [2026-10-23 v30] 大块头端口不写死：8080 是自建路由，官方 Strata 默认 8095。找「回 /health 且 service=strata」的那个口。
+// 大块头端口不写死：8080 是自建路由，官方 Strata 默认 8095。找「回 /health 且 service=strata」的那个口。
 async function healthAt(port) {
   try {
     const ctl = new AbortController();
@@ -170,7 +168,7 @@ for (const p of [8080, 8095, 8081, 8082, 8100]) {
   }
 
   const res = {
-    // [2026-10-22 v26] 用本地时间：界面别处（日志/功率/模型清单）都是本地时间，这里写 UTC 会让用户看错 8 小时
+// 用本地时间：界面别处（日志/功率/模型清单）都是本地时间，这里写 UTC 会让用户看错 8 小时
     at: (function () {
       const d = new Date();
       const p = n => String(n).padStart(2, '0');
